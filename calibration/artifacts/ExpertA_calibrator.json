@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "task": "binary_thyroid_malignancy",
+  "label_definition": "y_malignant: 0=benign, 1=malignant",
+  "score_definition": "p_malignant_raw in [0,1] or logit in R",
+  "method": "temperature",
+  "params": {
+    "T": 0.05,
+    "scores_are_logits": false
+  },
+  "metrics": {
+    "n_samples": 4,
+    "nll_raw": 0.29109188743339415,
+    "ece_raw": 0.24500000000000002,
+    "nll_calibrated": 7.517242777620082e-05,
+    "ece_calibrated": 7.516112709211843e-05
+  }
+}

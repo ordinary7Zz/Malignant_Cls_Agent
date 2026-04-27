@@ -1,0 +1,10 @@
+# 仅用于 infer_images.py 推理的最小依赖（按环境自选 torch/torchvision 的 CUDA 版本）
+numpy>=1.22
+pandas>=1.3
+Pillow>=9.0
+scipy>=1.9
+torch>=1.13
+torchvision>=0.14
+tqdm>=4.60
+transformers>=4.20
+ml-collections>=0.1.1

@@ -1,0 +1,16 @@
+# infer_resnet：仅运行 infer_resnet_directory.py 的最小依赖
+#
+# 建议先按机器环境安装 PyTorch（CUDA/CPU）:
+#   https://pytorch.org/get-started/locally/
+# 例如 CUDA 11.8:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+#
+# 再安装其余:
+#   pip install -r requirements.txt
+
+torch>=2.0.0
+torchvision>=0.15.0
+pillow>=9.4.0
+numpy>=1.23.0
+pandas>=1.5.3
+tqdm>=4.65.0

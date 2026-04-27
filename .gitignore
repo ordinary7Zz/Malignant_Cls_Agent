@@ -1,0 +1,19 @@
+# 超大模型权重（必须忽略）
+weights/
+
+# 输出与缓存
+output/
+test_dataset/
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# 系统/IDE 文件
+.DS_Store
+.ipynb_checkpoints/
+.vscode/
+.idea/
