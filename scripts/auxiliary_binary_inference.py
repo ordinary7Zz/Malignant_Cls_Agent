@@ -1,5 +1,5 @@
 """
-为 main2 提供的二分类推理服务：
+为 恶性二分类 提供的二分类推理服务：
 
 - 淋巴结转移二分类：与 ``infer_llnm/infer_images.py`` 相同的 LLNM-Net 推理流程（经子进程调用，避免与根目录 ``models`` 包冲突）
 - 转移病理亚型二分类：与 ``infer_resnet/infer_resnet_directory.py`` 相同的 ResNet-18 目录推理流程

@@ -1,10 +1,10 @@
 """
-Main2 专用分类 Agent。
+恶性二分类 专用分类 Agent。
 
 设计目标：
 - 不依赖 base_datasets_info 或任何基础数据集元信息。
 - 支持 4 类模型输出（DINO / AutoGluon / LLNM / ResNet）统一融合。
-- 保持与现有 main2 调用接口兼容。
+- 保持与现有 main 调用接口兼容。
 """
 
 import json
@@ -59,7 +59,7 @@ class AgentDecision:
 
 class LLMClassificationAgent:
     """
-    Main2 专用多模型融合 Agent。
+    恶性二分类 专用多模型融合 Agent。
 
     决策信息源仅包括：
     - 模型输出概率（含 top_confidence）
