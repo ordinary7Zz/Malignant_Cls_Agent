@@ -68,6 +68,15 @@ def _resolve_runtime_path(project_root: Path, p: Any) -> Optional[str]:
     return str(path)
 
 
+def _to_result_image_key(image_file: Path, image_root_dir: Optional[Path]) -> str:
+    try:
+        if image_root_dir is not None:
+            return image_file.resolve().relative_to(image_root_dir.resolve()).as_posix()
+    except Exception:
+        pass
+    return image_file.name
+
+
 def get_image_files(directory: str) -> List[Path]:
     """获取目录中所有图像文件"""
     directory = Path(directory)
@@ -1014,7 +1023,7 @@ def main(config_path: str = "config/config.yaml"):
         for idx, image_file, predictions_dict in valid_data:
             batch_predictions.append({
                 "image_file": str(image_file),
-                "image_name": image_file.name,
+                "image_name": _to_result_image_key(image_file, image_root_dir),
                 "predictions": list(predictions_dict.values())
             })
 
@@ -1053,7 +1062,7 @@ def main(config_path: str = "config/config.yaml"):
                 # 保存结果
                 result_dict = {
                     "image_file": str(image_file),
-                    "image_name": image_file.name,
+                    "image_name": _to_result_image_key(image_file, image_root_dir),
                     "selected_model": decision.selected_model,
                     "predicted_class": decision.selected_class,
                     "confidence": float(decision.confidence),
@@ -1214,10 +1223,10 @@ def main(config_path: str = "config/config.yaml"):
                         label_int = int(raw_label)
                     except Exception:
                         continue
-                    # -1 表示该图像缺少当前任务标签，按约定跳过。
                     if label_int == -1:
                         continue
-                    labels[str(fn)] = label_int
+                    normalized = str(fn).replace('\\', '/').strip()
+                    labels[normalized] = label_int
             elif isinstance(data, dict):
                 for k, v in data.items():
                     try:
@@ -1226,17 +1235,26 @@ def main(config_path: str = "config/config.yaml"):
                         continue
                     if label_int == -1:
                         continue
-                    labels[str(k)] = label_int
+                    normalized = str(k).replace('\\', '/').strip()
+                    labels[normalized] = label_int
             return labels
 
         def _label_lookup(labels: dict[str, int], image_name: str):
-            # 直接匹配
-            if image_name in labels:
-                return labels[image_name]
+            normalized_name = str(image_name).replace('\\', '/').strip()
 
-            # 常见情况：结果里叫 "TN3K_test_0000.jpg"；labels 里可能是 "0000.jpg"
-            ext = Path(image_name).suffix
-            stem = Path(image_name).stem
+            if normalized_name in labels:
+                return labels[normalized_name]
+
+            basename = Path(normalized_name).name
+            if basename in labels:
+                return labels[basename]
+
+            for key, value in labels.items():
+                if Path(key).name == basename:
+                    return value
+
+            ext = Path(normalized_name).suffix
+            stem = Path(normalized_name).stem
             tokens = stem.split("_")
             if len(tokens) >= 2:
                 candidate = tokens[-1] + ext
