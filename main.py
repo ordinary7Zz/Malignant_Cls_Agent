@@ -50,6 +50,12 @@ from scripts.auxiliary_binary_inference import (
 )
 
 
+def load_config(config_path: str = "config/config.yaml"):
+    """加载配置文件"""
+    with open(config_path, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
+
+
 def _resolve_runtime_path(project_root: Path, p: Any) -> Optional[str]:
     if p is None:
         return None
