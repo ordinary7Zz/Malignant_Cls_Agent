@@ -10,7 +10,7 @@ agent_llm:
 # 优先级：模型内 batch_size > 本节默认值 > 代码内置默认值
 batch_size:
   dino_unet: 4
-  autogluon: 32
+  autogluon: 1
   llnm: 4
   pathology_subtype_resnet: 4
 

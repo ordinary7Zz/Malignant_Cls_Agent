@@ -50,10 +50,17 @@ from scripts.auxiliary_binary_inference import (
 )
 
 
-def load_config(config_path: str = "config/config2.yaml"):
-    """加载配置文件"""
-    with open(config_path, 'r', encoding='utf-8') as f:
-        return yaml.safe_load(f)
+def _resolve_runtime_path(project_root: Path, p: Any) -> Optional[str]:
+    if p is None:
+        return None
+    s = str(p).strip()
+    if not s or s.lower() == "null":
+        return None
+    path = Path(s)
+    if not path.is_absolute():
+        path = (project_root / path).resolve()
+    return str(path)
+
 
 def get_image_files(directory: str) -> List[Path]:
     """获取目录中所有图像文件"""
@@ -399,6 +406,7 @@ def main(config_path: str = "config/config.yaml"):
 
     # 使用统一的 config 作为 paths_config（所有配置都在 config.yaml 中）
     paths_config = config
+    project_root = Path(__file__).resolve().parent
     model_groups = resolve_pipeline_model_configs(paths_config)
     dino_models_config = model_groups["dino_unet"]
     autogluon_models_config = model_groups["autogluon"]
@@ -572,11 +580,37 @@ def main(config_path: str = "config/config.yaml"):
 
         print()
 
-    if len(registry.list_models()) == 0:
+    print(">>> 检查 LLNM 模型配置")
+    if not llnm_models_config:
+        print("⚠️  没有配置 LLNM 模型\n")
+    else:
+        print(f"    找到 {len(llnm_models_config)} 个 LLNM 模型配置")
+        for idx, model_config in enumerate(llnm_models_config, 1):
+            model_name = model_config.get('name', f'llnm_{idx}')
+            model_path = _resolve_runtime_path(project_root, model_config.get('model_path'))
+            norm_params_file = _resolve_runtime_path(project_root, model_config.get('norm_params_file'))
+
+            print(f"\n    [{idx}] {model_name}")
+            print(f"        权重: {model_path or model_config.get('model_path')}")
+            if norm_params_file:
+                print(f"        归一化参数: {norm_params_file}")
+
+            if not model_path or not os.path.isfile(model_path):
+                print("        ⚠️  权重不存在，后续推理将跳过")
+                continue
+
+            if norm_params_file and not os.path.isfile(norm_params_file):
+                print("        ⚠️  归一化参数文件不存在，将按未提供处理")
+            else:
+                print(f"        设备: {model_config.get('device', global_device)}")
+                print("        ✓ 配置有效，统一推理阶段加载")
+
+        print()
+
+    if len(registry.list_models()) == 0 and not llnm_models_config and not pathology_resnet_models_config:
         print("没有可用的模型，退出。")
         return
 
-    project_root = Path(__file__).resolve().parent
     try:
         cal_map = load_calibration_map_from_config(config, project_root)
         registry.calibration_map = cal_map if cal_map else None
@@ -808,20 +842,35 @@ def main(config_path: str = "config/config.yaml"):
                 chunk_masks = batch_masks[start:end]
 
                 if is_autogluon:
-                    # 使用优化的批量预测。
-                    # 注意：PyRadiomics 特征提取内部仍逐张，但 AutoGluon 概率预测可批量执行。
-                    chunk_results = model.predict_batch(
-                        chunk_images,
-                        chunk_masks,
-                        show_progress=True,
-                    )
-                    for j, r in enumerate(chunk_results):
-                        if r is not None:
+                    if len(chunk_images) == 1:
+                        try:
+                            single_result = model.predict(chunk_images[0], chunk_masks[0])
                             try:
-                                maybe_apply_calibration_map(r, registry.calibration_map)
+                                maybe_apply_calibration_map(single_result, registry.calibration_map)
                             except Exception:
                                 pass
-                        results[start + j] = r
+                            results[start] = single_result
+                            image_file = image_data[batch_indices[start]][0]
+                            print(f"    [{start+1}/{len(batch_images)}] {image_file.name}... ✓ {single_result.top_class} ({single_result.top_confidence:.4f})")
+                        except Exception as e:
+                            image_file = image_data[batch_indices[start]][0]
+                            print(f"    [{start+1}/{len(batch_images)}] {image_file.name}... ✗ 失败: {e}")
+                            results[start] = None
+                    else:
+                        # 使用优化的批量预测。
+                        # 注意：PyRadiomics 特征提取内部仍逐张，但 AutoGluon 概率预测可批量执行。
+                        chunk_results = model.predict_batch(
+                            chunk_images,
+                            chunk_masks,
+                            show_progress=True,
+                        )
+                        for j, r in enumerate(chunk_results):
+                            if r is not None:
+                                try:
+                                    maybe_apply_calibration_map(r, registry.calibration_map)
+                                except Exception:
+                                    pass
+                            results[start + j] = r
                 else:
                     # DINO 等模型按分块逐张处理。
                     for j, (image, mask) in enumerate(zip(chunk_images, chunk_masks)):
