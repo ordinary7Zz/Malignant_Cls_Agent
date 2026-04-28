@@ -1,0 +1,27 @@
+setting:
+  force2D: true
+  force2Ddimension: 0
+  minimumROIDimensions: 2
+  geometryTolerance: 1e-6
+  correctMask: true
+
+imageType:
+  Original: {}
+
+featureClass:
+  shape2D:
+    - Elongation
+    - MajorAxisLength
+    - MaximumDiameter
+    - MeshSurface
+    - MinorAxisLength
+    - Perimeter
+    - PerimeterSurfaceRatio
+    - PixelSurface
+    - Sphericity
+  firstorder: []
+  glcm: []
+  gldm: []
+  glrlm: []
+  glszm: []
+  ngtdm: []
