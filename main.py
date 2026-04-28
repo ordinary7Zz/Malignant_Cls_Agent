@@ -1465,7 +1465,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         type=str,
-        default="config/config2.yaml",
+        default="config/config.yaml",
         help="Path to YAML config file",
     )
     args = parser.parse_args()
