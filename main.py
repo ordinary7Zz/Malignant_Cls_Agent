@@ -1030,8 +1030,8 @@ def main(config_path: str = "config/config.yaml"):
     print("=" * 70)
 
     # 提前生成结果文件路径，便于 Agent 批量时每批完成后增量写入同一文件
-    output_dir = Path(paths_config['output'].get('output_dir', 'output'))
-    output_dir.mkdir(exist_ok=True)
+    output_dir = Path(paths_config['output'].get('output_dir', 'output')).expanduser()
+    output_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = output_dir / f"results_{timestamp}.json"
 
