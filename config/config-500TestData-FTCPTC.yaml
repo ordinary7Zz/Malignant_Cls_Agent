@@ -1,0 +1,118 @@
+# Classification Agent Configuration
+# agent_llm: 大模型 API 配置（与具体厂商无关，可配置 Gemini / 百炼 Qwen 等）
+agent_llm:
+  api_key: "sk-5dcf871f08cb4adb95bc131efa0337a1"
+  model_name: "qwen2.5-14b-instruct"
+  temperature: 0.3
+  max_tokens: 1024
+
+# Unified Batch Size Defaults
+# 优先级：模型内 batch_size > 本节默认值 > 代码内置默认值
+batch_size:
+  dino_unet: 4
+  autogluon: 1
+  llnm: 4
+  pathology_subtype_resnet: 4
+
+# Unified Device Default
+# 优先级：模型内 device > 全局 device > 代码内置默认值
+device: "cuda:0"
+
+# Global Binary Semantics
+# 全局二分类语义定义：用于统一解释所有模型的 0/1 输出
+binary_semantics:
+  class_0: "PTC"
+  class_1: "FTC"
+  positive_class_index: 1
+  task_premise: "固定前提：所有二分类任务均基于恶性甲状腺超声图像展开。"
+  task_description: "当前任务属于恶性甲状腺超声图像上的病例亚型（甲状腺乳头状癌（PTC）和甲状腺滤泡癌（FTC））二分类任务。"
+
+# Model Paths Configuration (甲状腺模型路径)
+# 统一模型配置：所有模型均放在 models 下；每一类是一个列表。
+# - dino_unet / autogluon: 主分类模型（与 main.py 一致）
+# - llnm / pathology_subtype_resnet: 恶性二分类 扩展候选模型（同为二分类）
+models:
+  dino_unet:
+    - name: "dino_unet"  # 模型名称
+      enable: false
+      model_path: "weights/dino_unet/dino_unet_train_multitask_LNM_CN01_LNM_CN01_epoch_50.pth"
+      use_tirads: false  # true: 使用 TI-RADS 分类, false: 使用良恶性分类
+      # 在多个测试集上的性能
+      test_set_performance:
+        test_dataset1:
+          accuracy: 0.5882
+          auc: 0.5926
+    - name: "dino_unet"  # 模型名称
+      enable: true
+      model_path: "weights/dino_unet/dino_unet_train_multitask_FTCPTC_FTCPTC_epoch_50.pth"
+      use_tirads: false  # true: 使用 TI-RADS 分类, false: 使用良恶性分类
+      # 在多个测试集上的性能
+      test_set_performance:
+        test_dataset1:
+          accuracy: 0.5862
+          auc: 0.6938
+
+  autogluon:
+    - name: "autogluon_radiomics_LNMCN01"  # 模型名称
+      enable: false
+      model_dir: "weights/autogluon/LNM_CN01"
+      # 在多个测试集上的性能
+      test_set_performance:
+        test_dataset1:
+          accuracy: 0.6897
+          auc: 0.7195
+    - name: "autogluon_radiomics_FTCPTC"  # 模型名称
+      enable: true
+      model_dir: "weights/autogluon/FTCPTC"
+      # 在多个测试集上的性能
+      test_set_performance:
+        test_dataset1:
+          accuracy: 0.5125
+          auc: 0.6130
+
+  # 恶性二分类 扩展候选模型：enable=true 时纳入候选并参与最终决策
+  llnm:
+    - name: "llnm"
+      enable: false
+      model_path: "weights/llnm/checkpoint_epoch_049.pth"  # 请改为实际权重路径
+      norm_params_file: "weights/llnm/train_norm_params.pkl"  # 训练若使用 prepare_data 归一化，填 train_norm_params.pkl
+      threshold: 0.5
+      default_report: ""
+      default_age: 50.0
+      default_sex: 1.0
+      default_shape_echo: [0.0, 0.0]
+      # 在多个测试集上的性能
+      test_set_performance:
+        test_dataset1:
+          accuracy: 0.7333
+          auc: 0.7085
+
+  pathology_subtype_resnet:
+    - name: "tiger-model-resnet"
+      enable: true
+      pth_path: "weights/tiger-model-resnet/epoch_023_Thyroid_PTC_vs_FTC_json_V0.658_T0.511.pth"  # 请改为实际 state_dict 路径
+      architecture: "resnet"
+      # 在多个测试集上的性能
+      test_set_performance:
+        test_dataset1:
+          accuracy: 0.5095
+          auc: 0.3487
+
+# Data Paths (输入数据路径)
+data:
+  image_input: "/mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Malignant_ultrasound_images_cropped/500_TestData_Malignancy/images"
+  mask_input: "/mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Malignant_ultrasound_images_cropped/500_TestData_Malignancy/masks"  # 可选：如果模型需要掩码输入
+  label_file: "/mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Malignant_ultrasound_images_cropped/500_TestData_Malignancy/500_TestData_Malignancy.json"  # 标签文件路径；为 null 时将根据 output_dir 自动推断
+  label_key: "FTCPTC"  # 标签键名；为空时按兼容模式读取 malignancy/label，值为 -1 的样本会跳过
+
+# Output Configuration (输出配置)
+output:
+  output_dir: "./output/test_dataset/500_TestData_Malignancy/FTCPTC"
+
+# Agent Configuration
+agent:
+  decision_threshold: 0.3
+  max_retries: 3
+  max_batch_size: 2  # Maximum images per batch API call
+  enable_agent: false  # true: 使用大模型决策；false: 不调用大模型，按 top_k 置信度 soft voting
+  top_k: 2  # 无 Agent 时：对 top_confidence 最高的 top_k 个模型做 soft voting；有 Agent 且存在分歧时：大模型选出 top_k 个模型再融合。为 1 时与原先单模型决策一致

@@ -25,6 +25,7 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     f1_score,
+    roc_curve,
 )
 
 # 添加当前目录到路径
@@ -75,6 +76,26 @@ def _to_result_image_key(image_file: Path, image_root_dir: Optional[Path]) -> st
     except Exception:
         pass
     return image_file.name
+
+
+def _binary_probabilities_from_prediction(predicted_class: Any, confidence: Any) -> tuple[float, float]:
+    pred_class = str(predicted_class).strip()
+    pred_lower = pred_class.lower()
+    try:
+        conf = float(confidence)
+    except Exception:
+        conf = 0.5
+    conf = min(max(conf, 0.0), 1.0)
+
+    if pred_class == "1" or pred_lower == "1":
+        prob_class_1 = conf
+    elif pred_class == "0" or pred_lower == "0":
+        prob_class_1 = 1.0 - conf
+    else:
+        prob_class_1 = 0.5
+
+    prob_class_0 = 1.0 - prob_class_1
+    return float(prob_class_0), float(prob_class_1)
 
 
 def get_image_files(directory: str) -> List[Path]:
@@ -1060,12 +1081,20 @@ def main(config_path: str = "config/config.yaml"):
                 print(f"  理由: {decision.reasoning}")
 
                 # 保存结果
+                prob_class_0, prob_class_1 = _binary_probabilities_from_prediction(
+                    decision.selected_class,
+                    decision.confidence,
+                )
                 result_dict = {
+                    "record_type": "sample",
                     "image_file": str(image_file),
                     "image_name": _to_result_image_key(image_file, image_root_dir),
                     "selected_model": decision.selected_model,
                     "predicted_class": decision.selected_class,
                     "confidence": float(decision.confidence),
+                    "prob_class_0": prob_class_0,
+                    "prob_class_1": prob_class_1,
+                    "true_label": None,
                     "reasoning": decision.reasoning,
                     "all_predictions": [
                         {
@@ -1096,12 +1125,20 @@ def main(config_path: str = "config/config.yaml"):
                         input_data_info=paths_config.get('data', {})
                     )
 
+                    prob_class_0, prob_class_1 = _binary_probabilities_from_prediction(
+                        decision.selected_class,
+                        decision.confidence,
+                    )
                     result_dict = {
+                        "record_type": "sample",
                         "image_file": str(image_file),
-                        "image_name": image_file.name,
+                        "image_name": _to_result_image_key(image_file, image_root_dir),
                         "selected_model": decision.selected_model,
                         "predicted_class": decision.selected_class,
                         "confidence": float(decision.confidence),
+                        "prob_class_0": prob_class_0,
+                        "prob_class_1": prob_class_1,
+                        "true_label": None,
                         "reasoning": decision.reasoning,
                         "all_predictions": [
                             {
@@ -1149,12 +1186,20 @@ def main(config_path: str = "config/config.yaml"):
             print(f"  置信度: {best_confidence:.4f}")
             print(f"  理由: {reasoning}")
 
+            prob_class_0, prob_class_1 = _binary_probabilities_from_prediction(
+                selected_class,
+                best_confidence,
+            )
             result_dict = {
+                "record_type": "sample",
                 "image_file": str(image_file),
-                "image_name": image_file.name,
+                "image_name": _to_result_image_key(image_file, image_root_dir),
                 "selected_model": selected_model_name,
                 "predicted_class": selected_class,
                 "confidence": float(best_confidence),
+                "prob_class_0": prob_class_0,
+                "prob_class_1": prob_class_1,
+                "true_label": None,
                 "reasoning": reasoning,
                 "all_predictions": [
                     {
@@ -1168,17 +1213,12 @@ def main(config_path: str = "config/config.yaml"):
             }
             all_results.append(result_dict)
 
-    # 11. 保存所有结果（Agent 批量模式下已按批增量写入 output_file，此处再次写入以统一格式并覆盖）
+    # 11. 保存所有结果（Agent 批量模式下已按批增量写入 output_file，此处在评估完成后统一覆盖）
     if len(all_results) > 0:
         print("\n" + "=" * 70)
-        print("保存结果")
+        print("结果汇总")
         print("=" * 70)
-
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(all_results, f, ensure_ascii=False, indent=2)
-
-        print(f"✓ 结果已保存到: {output_file}")
-        print(f"  共处理 {len(all_results)} 个图像")
+        print(f"待写出结果条目: {len(all_results)}")
 
         # 统计结果
         print("\n【统计信息】")
@@ -1261,6 +1301,36 @@ def main(config_path: str = "config/config.yaml"):
                 if candidate in labels:
                     return labels[candidate]
             return None
+
+        def _align_results_for_binary_eval(
+            results: list[dict[str, Any]],
+            labels: dict[str, int],
+        ) -> tuple[np.ndarray, np.ndarray, list[str], int]:
+            y_true_list: list[int] = []
+            y_prob_list: list[float] = []
+            aligned_image_names: list[str] = []
+            aligned_count = 0
+
+            for r in results:
+                if r.get("record_type", "sample") != "sample":
+                    continue
+
+                image_name = str(r.get("image_name") or "").strip()
+                gt = _label_lookup(labels, image_name)
+                if gt is None:
+                    r["true_label"] = None
+                    continue
+
+                prob_class_1 = float(r.get("prob_class_1", 0.5))
+                r["true_label"] = int(gt)
+                aligned_count += 1
+                aligned_image_names.append(image_name)
+                y_true_list.append(int(gt))
+                y_prob_list.append(prob_class_1)
+
+            y_true = np.asarray(y_true_list, dtype=np.int32)
+            y_prob = np.asarray(y_prob_list, dtype=np.float64)
+            return y_true, y_prob, aligned_image_names, aligned_count
 
         def _ece_binary(y_true: np.ndarray, y_prob: np.ndarray, n_bins: int = 10) -> float:
             # ECE: sum_{bins} (bin_prob * |acc_bin - conf_bin|)
@@ -1366,31 +1436,10 @@ def main(config_path: str = "config/config.yaml"):
 
                 labels = _load_labels(label_path, label_key=configured_label_key)
 
-                # 对齐 results 与 labels，构造 y_true / y_prob
-                y_true_list: list[int] = []
-                y_prob_list: list[float] = []
-                for r in all_results:
-                    image_name = r.get("image_name") or ""
-                    gt = _label_lookup(labels, image_name)
-                    if gt is None:
-                        continue
-
-                    pred_class = str(r.get("predicted_class", "")).strip()
-                    conf = float(r.get("confidence", 0.5))
-                    # 统一成 P(class_1)
-                    pred_lower = pred_class.lower()
-                    if pred_class == "1" or pred_lower == "1":
-                        p_class_1 = conf
-                    elif pred_class == "0" or pred_lower == "0":
-                        p_class_1 = 1.0 - conf
-                    else:
-                        p_class_1 = 0.5
-
-                    y_true_list.append(gt)
-                    y_prob_list.append(p_class_1)
-
-                y_true = np.asarray(y_true_list, dtype=np.int32)
-                y_prob = np.asarray(y_prob_list, dtype=np.float64)
+                y_true, y_prob, aligned_image_names, n_aligned = _align_results_for_binary_eval(
+                    all_results,
+                    labels,
+                )
                 n_eval = int(y_true.shape[0])
 
                 if n_eval == 0:
@@ -1406,6 +1455,44 @@ def main(config_path: str = "config/config.yaml"):
                         n_boot=n_boot,
                         seed=boot_seed,
                     )
+
+                    roc_fpr: list[float] = []
+                    roc_tpr: list[float] = []
+                    roc_thresholds: list[float] = []
+                    roc_auc_value: Optional[float] = None
+                    if len(np.unique(y_true)) > 1:
+                        try:
+                            fpr, tpr, thresholds = roc_curve(y_true, y_prob)
+                            roc_fpr = [float(v) for v in fpr.tolist()]
+                            roc_tpr = [float(v) for v in tpr.tolist()]
+                            roc_thresholds = [float(v) for v in thresholds.tolist()]
+                            roc_auc_value = None if np.isnan(point["auroc"]) else float(point["auroc"])
+                        except Exception:
+                            roc_fpr = []
+                            roc_tpr = []
+                            roc_thresholds = []
+                            roc_auc_value = None
+
+                    roc_summary = {
+                        "record_type": "roc_summary",
+                        "label_path": str(label_path),
+                        "label_key": configured_label_key,
+                        "decision_threshold": decision_threshold,
+                        "positive_class_index": 1,
+                        "n_total_results": len([r for r in all_results if r.get("record_type", "sample") == "sample"]),
+                        "n_aligned_samples": n_aligned,
+                        "aligned_image_names": aligned_image_names,
+                        "roc_curve_fpr": roc_fpr,
+                        "roc_curve_tpr": roc_tpr,
+                        "roc_curve_thresholds": roc_thresholds,
+                        "roc_auc": roc_auc_value,
+                    }
+
+                    all_results = [
+                        r for r in all_results
+                        if r.get("record_type", "sample") != "roc_summary"
+                    ]
+                    all_results.append(roc_summary)
 
                     print("\n【平均分类指标】")
                     print(f"  样本数: {n_eval}")
@@ -1452,6 +1539,17 @@ def main(config_path: str = "config/config.yaml"):
                     print(f"  指标已保存: {metrics_out_path}")
         except Exception as e:
             print(f"\n【平均分类指标】计算失败（已跳过）：{e}")
+
+        print("\n" + "=" * 70)
+        print("保存结果")
+        print("=" * 70)
+
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(all_results, f, ensure_ascii=False, indent=2)
+
+        print(f"✓ 结果已保存到: {output_file}")
+        sample_count = sum(1 for r in all_results if r.get("record_type", "sample") == "sample")
+        print(f"  共处理 {sample_count} 个图像")
 
     print("\n" + "=" * 70)
     print("演示完成")
