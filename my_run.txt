@@ -95,6 +95,12 @@ python scripts/plot_multi_auroc.py --inputs <json1> <json2> <json3>
 
 示例：
 python scripts/plot_multi_auroc.py --inputs output/a/results_1.json output/b/results_2.json output/c/results_3.json
+python scripts/plot_multi_auroc.py \
+  --inputs \
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/output/500_TestData_Malignancy_Cls/no_llm/results_20260503_201231.json \
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/output/test_dataset/500_TestData_Malignancy/LNM_CN01/results_20260503_182304.json \
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/output/test_dataset/500_TestData_Malignancy/FTCPTC/results_20260503_175834.json \
+  --labels BM LNMCN01 FTCPTC
 
 默认输出位置：
 - 第一个输入 JSON 所在目录
