@@ -93,7 +93,11 @@ def _resolve_roc_payload(records: list[dict[str, Any]]) -> dict[str, Any]:
     return _build_roc_from_samples(records)
 
 
-def _plot_roc(roc_payload: dict[str, Any], output_path: Path | None, title: str) -> None:
+def _default_output_path(input_path: Path) -> Path:
+    return input_path.with_name(f"{input_path.stem}_auroc.png")
+
+
+def _plot_roc(roc_payload: dict[str, Any], output_path: Path, title: str) -> None:
     fpr = np.asarray(roc_payload["roc_curve_fpr"], dtype=np.float64)
     tpr = np.asarray(roc_payload["roc_curve_tpr"], dtype=np.float64)
     auc_value = float(roc_payload["roc_auc"])
@@ -114,20 +118,16 @@ def _plot_roc(roc_payload: dict[str, Any], output_path: Path | None, title: str)
     plt.grid(True, linestyle="--", alpha=0.3)
     plt.tight_layout()
 
-    if output_path is not None:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(output_path, dpi=200, bbox_inches="tight")
-        print(f"AUROC 图已保存到: {output_path}")
-    else:
-        plt.show()
-
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    print(f"AUROC 图已保存到: {output_path}")
     plt.close()
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="从 results_*.json 绘制 AUROC 曲线")
     parser.add_argument("--input", required=True, help="results_*.json 文件路径")
-    parser.add_argument("--output", default=None, help="输出图片路径，可选")
+    parser.add_argument("--output", default=None, help="输出图片路径，可选；默认保存为输入文件同目录下的 <输入文件名>_auroc.png")
     parser.add_argument("--title", default="AUROC Curve", help="图标题")
     args = parser.parse_args()
 
@@ -135,7 +135,7 @@ def main() -> None:
     if not input_path.is_file():
         raise FileNotFoundError(f"未找到 results JSON: {input_path}")
 
-    output_path = Path(args.output).resolve() if args.output else None
+    output_path = Path(args.output).resolve() if args.output else _default_output_path(input_path)
     records = _load_results(input_path)
     roc_payload = _resolve_roc_payload(records)
     _plot_roc(roc_payload, output_path, args.title)

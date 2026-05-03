@@ -49,6 +49,7 @@ roc_summary 中的常用字段：
 作用：
 - 从单个 results_*.json 中读取 AUROC 所需信息
 - 绘制单条 AUROC 曲线
+- 不再弹窗显示，默认直接保存图片到磁盘
 
 基本命令：
 python scripts/plot_auroc_from_results.py --input <results_json_path>
@@ -56,10 +57,19 @@ python scripts/plot_auroc_from_results.py --input <results_json_path>
 示例：
 python scripts/plot_auroc_from_results.py --input output/test_dataset/FTCPTC/results_20260503_120000.json
 
-保存图片：
+默认输出位置：
+- 与输入 JSON 同目录
+- 文件名为 <输入文件名>_auroc.png
+- 例如：
+  output/test_dataset/FTCPTC/results_20260503_120000_auroc.png
+
+指定输出图片：
 python scripts/plot_auroc_from_results.py --input output/test_dataset/FTCPTC/results_20260503_120000.json --output output/test_dataset/FTCPTC/auroc.png
 
 自定义标题：
+python scripts/plot_auroc_from_results.py --input output/test_dataset/FTCPTC/results_20260503_120000.json --title "FTC vs PTC AUROC"
+
+自定义标题并指定输出：
 python scripts/plot_auroc_from_results.py --input output/test_dataset/FTCPTC/results_20260503_120000.json --output output/test_dataset/FTCPTC/auroc.png --title "FTC vs PTC AUROC"
 
 读取逻辑：
@@ -78,6 +88,7 @@ python scripts/plot_auroc_from_results.py --input output/test_dataset/FTCPTC/res
 - 将多个 results_*.json 画到同一张图中
 - 支持当前项目输出的 JSON
 - 也兼容 Classification_Agent 项目的 JSON
+- 不再弹窗显示，默认直接保存图片到磁盘
 
 基本命令：
 python scripts/plot_multi_auroc.py --inputs <json1> <json2> <json3>
@@ -85,10 +96,19 @@ python scripts/plot_multi_auroc.py --inputs <json1> <json2> <json3>
 示例：
 python scripts/plot_multi_auroc.py --inputs output/a/results_1.json output/b/results_2.json output/c/results_3.json
 
-保存图片：
+默认输出位置：
+- 第一个输入 JSON 所在目录
+- 文件名为 multi_auroc.png
+- 例如：
+  output/a/multi_auroc.png
+
+指定输出图片：
 python scripts/plot_multi_auroc.py --inputs output/a/results_1.json output/b/results_2.json --output output/multi_auroc.png
 
 自定义每条曲线名称：
+python scripts/plot_multi_auroc.py --inputs output/a/results_1.json output/b/results_2.json output/c/results_3.json --labels ModelA ModelB ModelC --title "Multi AUROC Comparison"
+
+自定义每条曲线名称并指定输出：
 python scripts/plot_multi_auroc.py --inputs output/a/results_1.json output/b/results_2.json output/c/results_3.json --labels ModelA ModelB ModelC --output output/multi_auroc.png --title "Multi AUROC Comparison"
 
 参数说明：
@@ -97,7 +117,7 @@ python scripts/plot_multi_auroc.py --inputs output/a/results_1.json output/b/res
 - --labels
   可选。每条曲线的图例名称，数量必须与 inputs 一致
 - --output
-  可选。输出图片路径
+  可选。输出图片路径；默认保存为第一个输入文件同目录下的 multi_auroc.png
 - --title
   可选。图标题
 
@@ -129,14 +149,14 @@ python main.py --config config/config-FTCPTC.yaml
 2) 找到输出的 results_*.json
 
 3) 绘制单条 AUROC
-python scripts/plot_auroc_from_results.py --input <results_json_path> --output <auroc_png_path>
+python scripts/plot_auroc_from_results.py --input <results_json_path>
 
 
 流程 B：多个结果画到同一张图
 1) 分别运行不同配置，得到多个 results_*.json
 
 2) 运行多曲线脚本
-python scripts/plot_multi_auroc.py --inputs <json1> <json2> <json3> --labels Exp1 Exp2 Exp3 --output <multi_png_path>
+python scripts/plot_multi_auroc.py --inputs <json1> <json2> <json3> --labels Exp1 Exp2 Exp3
 
 
 5. 常见问题

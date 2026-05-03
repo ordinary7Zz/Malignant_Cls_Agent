@@ -150,7 +150,14 @@ def _default_label(path: Path) -> str:
     return stem
 
 
-def _plot_multi_roc(curves: list[dict[str, Any]], output_path: Path | None, title: str) -> None:
+def _default_output_path(input_paths: list[Path]) -> Path:
+    if not input_paths:
+        raise ValueError("input_paths 不能为空。")
+    first_input = input_paths[0]
+    return first_input.parent / "multi_auroc.png"
+
+
+def _plot_multi_roc(curves: list[dict[str, Any]], output_path: Path, title: str) -> None:
     plt.figure(figsize=(8, 6.5))
     for curve in curves:
         fpr = np.asarray(curve["roc_curve_fpr"], dtype=np.float64)
@@ -173,13 +180,9 @@ def _plot_multi_roc(curves: list[dict[str, Any]], output_path: Path | None, titl
     plt.grid(True, linestyle="--", alpha=0.3)
     plt.tight_layout()
 
-    if output_path is not None:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(output_path, dpi=200, bbox_inches="tight")
-        print(f"多曲线 AUROC 图已保存到: {output_path}")
-    else:
-        plt.show()
-
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    print(f"多曲线 AUROC 图已保存到: {output_path}")
     plt.close()
 
 
@@ -187,7 +190,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="从多个 results_*.json 绘制多条 AUROC 曲线")
     parser.add_argument("--inputs", nargs="+", required=True, help="一个或多个 results_*.json 文件路径")
     parser.add_argument("--labels", nargs="*", default=None, help="每条曲线对应的显示名称，数量需与 inputs 一致")
-    parser.add_argument("--output", default=None, help="输出图片路径，可选")
+    parser.add_argument("--output", default=None, help="输出图片路径，可选；默认保存为第一个输入文件同目录下的 multi_auroc.png")
     parser.add_argument("--title", default="Multi-AUROC Curve", help="图标题")
     args = parser.parse_args()
 
@@ -200,7 +203,7 @@ def main() -> None:
         raise ValueError("--labels 的数量必须与 --inputs 一致。")
 
     labels = args.labels if args.labels else [_default_label(path) for path in input_paths]
-    output_path = Path(args.output).resolve() if args.output else None
+    output_path = Path(args.output).resolve() if args.output else _default_output_path(input_paths)
 
     curves: list[dict[str, Any]] = []
     for path, label in zip(input_paths, labels):
