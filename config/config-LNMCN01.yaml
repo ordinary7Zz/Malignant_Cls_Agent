@@ -111,8 +111,8 @@ output:
 
 # Agent Configuration
 agent:
-  decision_threshold: 0.5
+  decision_threshold: 0.3
   max_retries: 3
   max_batch_size: 2  # Maximum images per batch API call
   enable_agent: false  # true: 使用大模型决策；false: 不调用大模型，按 top_k 置信度 soft voting
-  top_k: 3  # 无 Agent 时：对 top_confidence 最高的 top_k 个模型做 soft voting；有 Agent 且存在分歧时：大模型选出 top_k 个模型再融合。为 1 时与原先单模型决策一致
+  top_k: 2  # 无 Agent 时：对 top_confidence 最高的 top_k 个模型做 soft voting；有 Agent 且存在分歧时：大模型选出 top_k 个模型再融合。为 1 时与原先单模型决策一致
