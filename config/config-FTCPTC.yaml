@@ -2,7 +2,7 @@
 # agent_llm: 大模型 API 配置（与具体厂商无关，可配置 Gemini / 百炼 Qwen 等）
 agent_llm:
   api_key: "sk-5dcf871f08cb4adb95bc131efa0337a1"
-  model_name: "qwen2.5-14b-instruct"
+  model_name: "qwen-vl-max-2025-08-13"
   temperature: 0.3
   max_tokens: 1024
 
@@ -107,12 +107,12 @@ data:
 
 # Output Configuration (输出配置)
 output:
-  output_dir: "./output/test_dataset/FTCPTC"
+  output_dir: "./output/test_dataset/FTCPTC/llm"
 
 # Agent Configuration
 agent:
   decision_threshold: 0.3
   max_retries: 3
   max_batch_size: 2  # Maximum images per batch API call
-  enable_agent: false  # true: 使用大模型决策；false: 不调用大模型，按 top_k 置信度 soft voting
-  top_k: 2  # 无 Agent 时：对 top_confidence 最高的 top_k 个模型做 soft voting；有 Agent 且存在分歧时：大模型选出 top_k 个模型再融合。为 1 时与原先单模型决策一致
+  enable_agent: true  # true: 使用大模型决策；false: 不调用大模型，按 top_k 置信度 soft voting
+  top_k: 1  # 无 Agent 时：对 top_confidence 最高的 top_k 个模型做 soft voting；有 Agent 且存在分歧时：大模型选出 top_k 个模型再融合。为 1 时与原先单模型决策一致

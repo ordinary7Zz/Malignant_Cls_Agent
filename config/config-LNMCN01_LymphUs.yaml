@@ -2,7 +2,7 @@
 # agent_llm: 大模型 API 配置（与具体厂商无关，可配置 Gemini / 百炼 Qwen 等）
 agent_llm:
   api_key: "sk-5dcf871f08cb4adb95bc131efa0337a1"
-  model_name: "qwen2.5-14b-instruct"
+  model_name: "qwen3.6-plus"
   temperature: 0.3
   max_tokens: 1024
 

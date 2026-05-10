@@ -2,7 +2,7 @@
 # agent_llm: 大模型 API 配置（与具体厂商无关，可配置 Gemini / 百炼 Qwen 等）
 agent_llm:
   api_key: "sk-5dcf871f08cb4adb95bc131efa0337a1"
-  model_name: "qwen2.5-14b-instruct"
+  model_name: "qwen3.6-flash"
   temperature: 0.3
   max_tokens: 1024
 
@@ -16,7 +16,7 @@ batch_size:
 
 # Unified Device Default
 # 优先级：模型内 device > 全局 device > 代码内置默认值
-device: "cuda:0"
+device: "cuda:3"
 
 # Global Binary Semantics
 # 全局二分类语义定义：用于统一解释所有模型的 0/1 输出
@@ -107,7 +107,7 @@ data:
 
 # Output Configuration (输出配置)
 output:
-  output_dir: "./output/test_dataset/500_TestData_Malignancy/FTCPTC"
+  output_dir: "./output/test_dataset/500_TestData_Malignancy/FTCPTC/no_llm"
 
 # Agent Configuration
 agent:
@@ -115,4 +115,4 @@ agent:
   max_retries: 3
   max_batch_size: 2  # Maximum images per batch API call
   enable_agent: false  # true: 使用大模型决策；false: 不调用大模型，按 top_k 置信度 soft voting
-  top_k: 2  # 无 Agent 时：对 top_confidence 最高的 top_k 个模型做 soft voting；有 Agent 且存在分歧时：大模型选出 top_k 个模型再融合。为 1 时与原先单模型决策一致
+  top_k: 1  # 无 Agent 时：对 top_confidence 最高的 top_k 个模型做 soft voting；有 Agent 且存在分歧时：大模型选出 top_k 个模型再融合。为 1 时与原先单模型决策一致
