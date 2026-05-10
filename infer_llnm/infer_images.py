@@ -71,16 +71,61 @@ def parse_device_arg(s: str) -> str:
     )
 
 
-def load_weights(model: torch.nn.Module, weight_path: str) -> torch.nn.Module:
-    pretrained_weights = torch.load(weight_path, map_location=torch.device("cpu"))
+def _extract_state_dict(checkpoint: dict) -> dict[str, torch.Tensor]:
+    if isinstance(checkpoint, dict):
+        for key in ("state_dict", "model_state_dict"):
+            nested = checkpoint.get(key)
+            if isinstance(nested, dict):
+                checkpoint = nested
+                break
+    if not isinstance(checkpoint, dict):
+        raise TypeError(f"不支持的权重格式: {type(checkpoint)!r}")
+    if any(k.startswith("module.") for k in checkpoint.keys()):
+        checkpoint = {k.replace("module.", ""): v for k, v in checkpoint.items()}
+    return checkpoint
+
+
+def _load_checkpoint_state_dict(weight_path: str) -> dict[str, torch.Tensor]:
+    checkpoint = torch.load(weight_path, map_location=torch.device("cpu"))
+    return _extract_state_dict(checkpoint)
+
+
+def _infer_num_classes_from_state_dict(
+    pretrained_weights: dict[str, torch.Tensor],
+) -> int | None:
+    head_weight = pretrained_weights.get("head.weight")
+    if isinstance(head_weight, torch.Tensor) and head_weight.ndim == 2:
+        return int(head_weight.shape[0])
+    head_bias = pretrained_weights.get("head.bias")
+    if isinstance(head_bias, torch.Tensor) and head_bias.ndim == 1:
+        return int(head_bias.shape[0])
+    return None
+
+
+def load_weights(
+    model: torch.nn.Module,
+    weight_path: str,
+    pretrained_weights: dict[str, torch.Tensor] | None = None,
+) -> torch.nn.Module:
+    pretrained_weights = pretrained_weights or _load_checkpoint_state_dict(weight_path)
     model_weights = model.state_dict()
-    if any(k.startswith("module.") for k in pretrained_weights.keys()):
-        pretrained_weights = {
-            k.replace("module.", ""): v for k, v in pretrained_weights.items()
-        }
-    load_weights = {k: v for k, v in pretrained_weights.items() if k in model_weights}
-    model_weights.update(load_weights)
+    loadable_weights = {}
+    skipped_shape_mismatch = []
+    for key, value in pretrained_weights.items():
+        if key not in model_weights:
+            continue
+        if model_weights[key].shape != value.shape:
+            skipped_shape_mismatch.append(
+                f"{key}: checkpoint {tuple(value.shape)} != model {tuple(model_weights[key].shape)}"
+            )
+            continue
+        loadable_weights[key] = value
+    model_weights.update(loadable_weights)
     model.load_state_dict(model_weights)
+    if skipped_shape_mismatch:
+        print("跳过尺寸不匹配的权重:")
+        for item in skipped_shape_mismatch:
+            print(f"  - {item}")
     print(f"已加载权重: {weight_path}")
     return model
 
@@ -588,7 +633,7 @@ def run_inference(
     model_path: str,
     dataset: Dataset,
     batch_size: int,
-    num_classes: int,
+    num_classes: int | None,
     device: str,
 ) -> tuple[list[str], np.ndarray]:
     if device.startswith("cuda") and not torch.cuda.is_available():
@@ -596,9 +641,21 @@ def run_inference(
         device = "cpu"
     device_t = torch.device(device)
 
+    pretrained_weights = _load_checkpoint_state_dict(model_path)
+    inferred_num_classes = _infer_num_classes_from_state_dict(pretrained_weights)
+    if num_classes is None:
+        if inferred_num_classes is None:
+            raise ValueError("无法从权重中推断 num_classes，请显式传入 --num_classes")
+        num_classes = inferred_num_classes
+        print(f"从权重自动识别 num_classes={num_classes}")
+    elif inferred_num_classes is not None and inferred_num_classes != num_classes:
+        print(
+            f"警告: 传入 num_classes={num_classes}，但权重分类头输出为 {inferred_num_classes}；将按传入值构建模型"
+        )
+
     config = CONFIGS["LLNM_Net"]
     model = LLNM_Net(config, 224, zero_head=True, num_classes=num_classes)
-    model = load_weights(model, model_path)
+    model = load_weights(model, model_path, pretrained_weights=pretrained_weights)
     model = model.to(device_t)
     model.eval()
 
@@ -636,13 +693,26 @@ def save_csv(
     out_path: str,
     threshold: float,
 ) -> None:
-    lines = ["relative_path," + ",".join([f"prob_class{i}" for i in range(probs.shape[1])]) + ",pred_class"]
+    header = ["relative_path"]
+    if probs.shape[1] == 1:
+        header.extend(["prob_class0", "prob_class1"])
+    else:
+        header.extend([f"prob_class{i}" for i in range(probs.shape[1])])
+    header.append("pred_class")
+
+    lines = [",".join(header)]
     for i, p in enumerate(paths):
-        row = [p] + [f"{probs[i, j]:.6f}" for j in range(probs.shape[1])]
-        pred = int(np.argmax(probs[i]))
-        if probs.shape[1] == 2:
-            pred = int(probs[i, 1] >= threshold)
-        row.append(str(pred))
+        if probs.shape[1] == 1:
+            prob1 = float(probs[i, 0])
+            prob0 = 1.0 - prob1
+            pred = int(prob1 >= threshold)
+            row = [p, f"{prob0:.6f}", f"{prob1:.6f}", str(pred)]
+        else:
+            row = [p] + [f"{probs[i, j]:.6f}" for j in range(probs.shape[1])]
+            pred = int(np.argmax(probs[i]))
+            if probs.shape[1] == 2:
+                pred = int(probs[i, 1] >= threshold)
+            row.append(str(pred))
         lines.append(",".join(row))
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -677,7 +747,7 @@ def build_parser() -> argparse.ArgumentParser:
         help='默认形态与回声特征（归一化前），格式 "shape,echo"',
     )
     p.add_argument("--batch_size", type=int, default=4)
-    p.add_argument("--num_classes", type=int, default=2)
+    p.add_argument("--num_classes", type=int, default=None, help="类别数；留空时从权重分类头自动识别")
     p.add_argument(
         "--device",
         type=parse_device_arg,

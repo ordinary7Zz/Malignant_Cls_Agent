@@ -72,7 +72,7 @@ def main() -> None:
         model_path=payload["model_path"],
         dataset=dataset,
         batch_size=int(payload.get("batch_size", 4)),
-        num_classes=int(payload.get("num_classes", 2)),
+        num_classes=payload.get("num_classes"),
         device=str(payload.get("device", "cuda")),
     )
 
@@ -81,15 +81,22 @@ def main() -> None:
     n = min(len(rels), len(probs))
     for i in range(n):
         row = probs[i]
-        pred = int(np.argmax(row))
-        if row.shape[0] == 2:
-            pred = int(row[1] >= threshold)
+        if row.shape[0] == 1:
+            prob_1 = float(row[0])
+            prob_0 = 1.0 - prob_1
+            pred = int(prob_1 >= threshold)
+        else:
+            pred = int(np.argmax(row))
+            if row.shape[0] == 2:
+                pred = int(row[1] >= threshold)
+            prob_0 = float(row[0]) if row.shape[0] > 0 else 0.0
+            prob_1 = float(row[1]) if row.shape[0] > 1 else float(row[0])
         out_rows.append(
             {
                 "path": str(records[i]["path"].resolve()),
                 "relative_path": rels[i],
-                "prob_class_0": float(row[0]) if row.shape[0] > 0 else 0.0,
-                "prob_class_1": float(row[1]) if row.shape[0] > 1 else float(row[0]),
+                "prob_class_0": prob_0,
+                "prob_class_1": prob_1,
                 "pred_class": pred,
             }
         )

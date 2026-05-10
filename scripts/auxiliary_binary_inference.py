@@ -109,7 +109,7 @@ def run_llnm_binary_for_image_paths(
     payload: dict[str, Any] = {
         "model_path": model_path,
         "batch_size": int(llnm_cfg.get("batch_size", 4)),
-        "num_classes": int(llnm_cfg.get("num_classes", 2)),
+        "num_classes": llnm_cfg.get("num_classes"),
         "device": dev,
         "threshold": float(llnm_cfg.get("threshold", 0.5)),
         "default_report": str(llnm_cfg.get("default_report", "") or ""),

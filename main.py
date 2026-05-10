@@ -453,12 +453,11 @@ def main(config_path: str = "config/config.yaml"):
     unified_num_classes = 2
     print(f"✓ 全局推理设备: {global_device}")
 
-    # 统一模型默认 batch_size/device/num_classes 注入。
+    # 统一模型默认 batch_size/device 注入；LLNM 的 num_classes 由配置或权重自动识别决定。
     for cfg in llnm_models_config:
         if "batch_size" not in cfg and unified_batch_sizes.get("llnm") is not None:
             cfg["batch_size"] = int(unified_batch_sizes["llnm"])
         cfg["device"] = global_device
-        cfg["num_classes"] = unified_num_classes
 
     for cfg in pathology_resnet_models_config:
         if "batch_size" not in cfg and unified_batch_sizes.get("pathology_subtype_resnet") is not None:
