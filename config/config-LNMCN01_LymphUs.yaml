@@ -35,7 +35,7 @@ models:
   dino_unet:
     - name: "dino_unet"  # 模型名称
       enable: true
-      model_path: "weights/dino_unet/LymphUs/dino_unet_train_multitask_LymphUs.pth"
+      model_path: "weights/dino_unet/LymphUs/dino_unet_train_multitask_LNM_CN01_LymphUs_LNM_CN01_epoch_20.pth"
       use_tirads: false  # true: 使用 TI-RADS 分类, false: 使用良恶性分类
       # 在多个测试集上的性能
       test_set_performance:
@@ -44,7 +44,7 @@ models:
           auc: 0.7551
     - name: "dino_unet"  # 模型名称
       enable: false
-      model_path: "weights/dino_unet/FangDai/dino_unet_train_multitask_FangDai.pth"
+      model_path: "weights/dino_unet/FangDai/dino_unet_train_multitask_FTCPTC_FangDai_FTCPTC_epoch_50.pth"
       use_tirads: false  # true: 使用 TI-RADS 分类, false: 使用良恶性分类
       # 在多个测试集上的性能
       test_set_performance:
@@ -74,7 +74,7 @@ models:
   llnm:
     - name: "llnm"
       enable: true
-      model_path: "weights/llnm/LymphUs/llnm_LymphUs.pth"  # 请改为实际权重路径
+      model_path: "weights/llnm/LymphUs/checkpoint_epoch_050.pth"  # 请改为实际权重路径
       norm_params_file: "weights/llnm/LymphUs/train_norm_params.pkl"  # 训练若使用 prepare_data 归一化，填 train_norm_params.pkl
       threshold: 0.5
       default_report: ""
