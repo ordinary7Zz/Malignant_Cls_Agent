@@ -100,7 +100,7 @@ models:
 
 # Data Paths (输入数据路径)
 data:
-  image_input: "/mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Lymph_Node_Metastasis/center/images"
+  image_input: "/mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Lymph_Node_Metastasis/center2/images"
   mask_input: "/mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Lymph_Node_Metastasis/center2/masks"  # 可选：如果模型需要掩码输入
   label_file: "/mnt/wangbd8/workspace/DataSets/ThyroidAgent/Classifaction_Data/Lymph_Node_Metastasis/LymphUs_test_labels.json"  # 标签文件路径；为 null 时将根据 output_dir 自动推断
   label_key: "LNM_CN01"  # 标签键名；为空时按兼容模式读取 malignancy/label，值为 -1 的样本会跳过
