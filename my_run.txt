@@ -92,7 +92,7 @@ python scripts/plot_auroc_from_results.py --input output/test_dataset/FTCPTC/res
 - 不再弹窗显示，默认直接保存图片到磁盘
 
 基本命令：
-python scripts/plot_multi_auroc.py --inputs <json1> <json2> <json3>
+python scripts/plot_multi_auroc.py --inputs <json1> <json2> <json3> --labels <task1> <task2> <task3>
 
 示例：
 python scripts/plot_multi_auroc.py --inputs output/a/results_1.json output/b/results_2.json output/c/results_3.json
@@ -129,7 +129,7 @@ python scripts/plot_multi_auroc.py --inputs output/a/results_1.json output/b/res
 - --inputs
   一个或多个 results_*.json 路径，必填
 - --labels
-  可选。每条曲线的图例名称，数量必须与 inputs 一致
+  必填。每条曲线对应的任务名称，数量必须与 inputs 一致；同时用于匹配医生性能点
 - --doctor-json
   可选。医生读片性能 JSON 路径，通常是 evaluate_doctor_csv.py 输出的 doctor_multi_task_metrics.json
 - --output
@@ -152,7 +152,7 @@ B. Classification_Agent 输出的结果：
 C. 医生读片性能汇总 JSON：
 - 读取 doctor_multi_task_metrics.json 中的 plot_points
 - 在图上绘制点，而不是 AUROC 曲线
-- 只会绘制 task_label 与模型曲线任务名一致的医生点
+- 只会绘制 task_label 与 --labels 中任务名一致的医生点
 
 注意：
 - 多条曲线画在一起时，最好保证它们是同一个二分类任务，否则虽然能画在一起，但比较意义有限
