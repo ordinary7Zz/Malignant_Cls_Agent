@@ -199,21 +199,12 @@ def _default_output_path() -> Path:
 
 def _build_doctor_display_label(point: dict[str, Any]) -> str:
     metrics = point.get("metrics") or {}
-    recall = metrics.get("recall")
-    specificity = metrics.get("specificity")
-    n_samples = point.get("n_samples")
+    accuracy = metrics.get("accuracy")
 
     label = point["label"]
-    parts: list[str] = []
-    if recall is not None:
-        parts.append(f"Recall={float(recall):.4f}")
-    if specificity is not None:
-        parts.append(f"Spec={float(specificity):.4f}")
-    if n_samples is not None:
-        parts.append(f"n={int(n_samples)}")
-    if not parts:
+    if accuracy is None:
         return label
-    return f"{label} ({', '.join(parts)})"
+    return f"{label} (Acc={float(accuracy):.4f})"
 
 
 def _plot_multi_roc(
@@ -241,7 +232,7 @@ def _plot_multi_roc(
             (point["fpr"], point["tpr"]),
             textcoords="offset points",
             xytext=(6, 6),
-            fontsize=8,
+            fontsize=10,
         )
 
     plt.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="gray", label="Random")
