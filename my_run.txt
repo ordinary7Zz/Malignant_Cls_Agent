@@ -198,7 +198,7 @@ python scripts/evaluate_doctor_csv.py \
 
 单个任务示例：
 python scripts/evaluate_doctor_csv.py \
-  --inputs "D:/workspace/ThyroidAgent/Classification_Models/Malignant_Cls_Agent/医生良恶性标注.csv" \
+  --inputs "./医生良恶性标注.csv" \
   --task-labels BM
 
 默认输出位置：

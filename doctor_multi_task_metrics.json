@@ -1,0 +1,76 @@
+{
+  "record_type": "doctor_multi_task_roc_point_summary",
+  "schema": "doctor_csv_multi_task_multi_doctor",
+  "n_tasks": 1,
+  "tasks": [
+    {
+      "task_label": "BM",
+      "input_csv": "/mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/医生良恶性标注.csv",
+      "n_doctors": 1,
+      "n_samples": 500,
+      "n_positive": 250,
+      "n_negative": 250,
+      "doctors": [
+        {
+          "doctor_label": "doctor_1",
+          "column_name": "doctor_1",
+          "column_index": 2,
+          "n_samples": 500,
+          "n_positive": 250,
+          "n_negative": 250,
+          "confusion_matrix": {
+            "tp": 182,
+            "tn": 214,
+            "fp": 36,
+            "fn": 68
+          },
+          "metrics": {
+            "n_samples": 500,
+            "n_positive": 250,
+            "n_negative": 250,
+            "accuracy": 0.792,
+            "precision": 0.8348623853211009,
+            "recall": 0.728,
+            "specificity": 0.856,
+            "fpr": 0.144,
+            "f1": 0.7777777777777778
+          },
+          "roc_point": {
+            "fpr": 0.144,
+            "tpr": 0.728
+          }
+        }
+      ]
+    }
+  ],
+  "plot_points": [
+    {
+      "task_label": "BM",
+      "doctor_label": "doctor_1",
+      "label": "BM - doctor_1",
+      "input_csv": "/mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/医生良恶性标注.csv",
+      "n_samples": 500,
+      "confusion_matrix": {
+        "tp": 182,
+        "tn": 214,
+        "fp": 36,
+        "fn": 68
+      },
+      "metrics": {
+        "n_samples": 500,
+        "n_positive": 250,
+        "n_negative": 250,
+        "accuracy": 0.792,
+        "precision": 0.8348623853211009,
+        "recall": 0.728,
+        "specificity": 0.856,
+        "fpr": 0.144,
+        "f1": 0.7777777777777778
+      },
+      "roc_point": {
+        "fpr": 0.144,
+        "tpr": 0.728
+      }
+    }
+  ]
+}
