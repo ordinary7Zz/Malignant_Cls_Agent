@@ -9,9 +9,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def _load_results(path: Path) -> list[dict[str, Any]]:
+def _load_json(path: Path) -> Any:
     with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+        return json.load(f)
+
+
+def _load_results(path: Path) -> list[dict[str, Any]]:
+    data = _load_json(path)
     if not isinstance(data, list):
         raise ValueError(f"results JSON 必须是列表格式: {path}")
     return [item for item in data if isinstance(item, dict)]
@@ -143,6 +147,45 @@ def _resolve_roc_payload(records: list[dict[str, Any]], source: Path) -> dict[st
     raise ValueError(f"无法识别或提取可用于 AUROC 的字段: {source}")
 
 
+def _load_doctor_points(path: Path) -> list[dict[str, Any]]:
+    data = _load_json(path)
+    if not isinstance(data, dict):
+        raise ValueError(f"医生性能 JSON 必须是对象格式: {path}")
+    if data.get("record_type") != "doctor_multi_task_roc_point_summary":
+        raise ValueError(f"无法识别的医生性能 JSON: {path}")
+
+    plot_points = data.get("plot_points")
+    if not isinstance(plot_points, list):
+        raise ValueError(f"医生性能 JSON 缺少 plot_points 列表: {path}")
+
+    points: list[dict[str, Any]] = []
+    for item in plot_points:
+        if not isinstance(item, dict):
+            continue
+        roc_point = item.get("roc_point") or {}
+        fpr = roc_point.get("fpr")
+        tpr = roc_point.get("tpr")
+        if fpr is None or tpr is None:
+            continue
+
+        task_label = str(item.get("task_label") or "")
+        doctor_label = str(item.get("doctor_label") or "")
+        points.append(
+            {
+                "task_label": task_label,
+                "doctor_label": doctor_label,
+                "label": str(item.get("label") or f"{task_label} - {doctor_label}"),
+                "fpr": float(fpr),
+                "tpr": float(tpr),
+                "n_samples": item.get("n_samples"),
+                "metrics": item.get("metrics") or {},
+                "source": str(path),
+            }
+        )
+
+    return points
+
+
 def _default_label(path: Path) -> str:
     stem = path.stem
     if stem.startswith("results_"):
@@ -150,14 +193,39 @@ def _default_label(path: Path) -> str:
     return stem
 
 
-def _default_output_path(input_paths: list[Path]) -> Path:
-    if not input_paths:
-        raise ValueError("input_paths 不能为空。")
-    first_input = input_paths[0]
-    return first_input.parent / "multi_auroc.png"
+def _extract_task_label(path: Path) -> str:
+    return path.parent.name
 
 
-def _plot_multi_roc(curves: list[dict[str, Any]], output_path: Path, title: str) -> None:
+def _default_output_path() -> Path:
+    return Path.cwd() / "multi_auroc.png"
+
+
+def _build_doctor_display_label(point: dict[str, Any]) -> str:
+    metrics = point.get("metrics") or {}
+    recall = metrics.get("recall")
+    specificity = metrics.get("specificity")
+    n_samples = point.get("n_samples")
+
+    label = point["label"]
+    parts: list[str] = []
+    if recall is not None:
+        parts.append(f"Recall={float(recall):.4f}")
+    if specificity is not None:
+        parts.append(f"Spec={float(specificity):.4f}")
+    if n_samples is not None:
+        parts.append(f"n={int(n_samples)}")
+    if not parts:
+        return label
+    return f"{label} ({', '.join(parts)})"
+
+
+def _plot_multi_roc(
+    curves: list[dict[str, Any]],
+    doctor_points: list[dict[str, Any]],
+    output_path: Path,
+    title: str,
+) -> None:
     plt.figure(figsize=(8, 6.5))
     for curve in curves:
         fpr = np.asarray(curve["roc_curve_fpr"], dtype=np.float64)
@@ -169,6 +237,16 @@ def _plot_multi_roc(curves: list[dict[str, Any]], output_path: Path, title: str)
         else:
             label = f"{curve['label']} (AUC={auc_value:.4f}, n={n_samples})"
         plt.plot(fpr, tpr, linewidth=2, label=label)
+
+    for point in doctor_points:
+        plt.scatter(point["fpr"], point["tpr"], s=70, marker="o", zorder=5)
+        plt.annotate(
+            _build_doctor_display_label(point),
+            (point["fpr"], point["tpr"]),
+            textcoords="offset points",
+            xytext=(6, 6),
+            fontsize=8,
+        )
 
     plt.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="gray", label="Random")
     plt.xlim(0.0, 1.0)
@@ -187,10 +265,11 @@ def _plot_multi_roc(curves: list[dict[str, Any]], output_path: Path, title: str)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="从多个 results_*.json 绘制多条 AUROC 曲线")
+    parser = argparse.ArgumentParser(description="从多个 results_*.json 绘制多条 AUROC 曲线，并可叠加医生读片性能点")
     parser.add_argument("--inputs", nargs="+", required=True, help="一个或多个 results_*.json 文件路径")
     parser.add_argument("--labels", nargs="*", default=None, help="每条曲线对应的显示名称，数量需与 inputs 一致")
-    parser.add_argument("--output", default=None, help="输出图片路径，可选；默认保存为第一个输入文件同目录下的 multi_auroc.png")
+    parser.add_argument("--doctor-json", default=None, help="医生读片性能 JSON 路径，可选；支持 doctor_multi_task_metrics.json")
+    parser.add_argument("--output", default=None, help="输出图片路径，可选；默认保存为当前运行目录下的 multi_auroc.png")
     parser.add_argument("--title", default="Multi-AUROC Curve", help="图标题")
     args = parser.parse_args()
 
@@ -199,22 +278,38 @@ def main() -> None:
         if not path.is_file():
             raise FileNotFoundError(f"未找到 results JSON: {path}")
 
+    doctor_json_path = Path(args.doctor_json).resolve() if args.doctor_json else None
+    if doctor_json_path is not None and not doctor_json_path.is_file():
+        raise FileNotFoundError(f"未找到医生性能 JSON: {doctor_json_path}")
+
     if args.labels is not None and len(args.labels) > 0 and len(args.labels) != len(input_paths):
         raise ValueError("--labels 的数量必须与 --inputs 一致。")
 
     labels = args.labels if args.labels else [_default_label(path) for path in input_paths]
-    output_path = Path(args.output).resolve() if args.output else _default_output_path(input_paths)
+    output_path = Path(args.output).resolve() if args.output else _default_output_path()
 
     curves: list[dict[str, Any]] = []
+    curve_task_labels: set[str] = set()
     for path, label in zip(input_paths, labels):
         records = _load_results(path)
         payload = _resolve_roc_payload(records, path)
         payload["label"] = label
         payload["source"] = str(path)
+        payload["task_label"] = _extract_task_label(path)
         curves.append(payload)
-        print(f"已加载: {label} | schema={payload['schema']} | AUC={float(payload['roc_auc']):.4f}")
+        curve_task_labels.add(payload["task_label"])
+        print(f"已加载曲线: {label} | schema={payload['schema']} | AUC={float(payload['roc_auc']):.4f}")
 
-    _plot_multi_roc(curves, output_path, args.title)
+    doctor_points: list[dict[str, Any]] = []
+    if doctor_json_path is not None:
+        loaded_points = _load_doctor_points(doctor_json_path)
+        if curve_task_labels:
+            doctor_points = [point for point in loaded_points if point.get("task_label") in curve_task_labels]
+        else:
+            doctor_points = loaded_points
+        print(f"已加载医生点: {len(doctor_points)} / {len(loaded_points)} | source={doctor_json_path}")
+
+    _plot_multi_roc(curves, doctor_points, output_path, args.title)
 
 
 if __name__ == "__main__":
