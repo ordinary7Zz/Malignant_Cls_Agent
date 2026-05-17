@@ -214,6 +214,7 @@ def _plot_multi_roc(
     title: str,
 ) -> None:
     plt.figure(figsize=(8, 6.5))
+    task_colors: dict[str, Any] = {}
     for curve in curves:
         fpr = np.asarray(curve["roc_curve_fpr"], dtype=np.float64)
         tpr = np.asarray(curve["roc_curve_tpr"], dtype=np.float64)
@@ -223,10 +224,12 @@ def _plot_multi_roc(
             label = f"{curve['label']} (AUC={auc_value:.4f})"
         else:
             label = f"{curve['label']} (AUC={auc_value:.4f}, n={n_samples})"
-        plt.plot(fpr, tpr, linewidth=2, label=label)
+        line, = plt.plot(fpr, tpr, linewidth=2, label=label)
+        task_colors[str(curve.get("task_label") or curve["label"])] = line.get_color()
 
     for point in doctor_points:
-        plt.scatter(point["fpr"], point["tpr"], s=70, marker="o", zorder=5)
+        point_color = task_colors.get(str(point.get("task_label") or ""))
+        plt.scatter(point["fpr"], point["tpr"], s=70, marker="o", color=point_color, zorder=5)
         plt.annotate(
             _build_doctor_display_label(point),
             (point["fpr"], point["tpr"]),
