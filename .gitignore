@@ -2,7 +2,7 @@
 weights/
 
 # 输出与缓存
-output/
+!output/
 test_dataset/
 
 # Python 缓存
