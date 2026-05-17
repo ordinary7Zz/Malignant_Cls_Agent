@@ -207,6 +207,30 @@ def _build_doctor_display_label(point: dict[str, Any]) -> str:
     return f"{label} (Acc={float(accuracy):.4f})"
 
 
+def _choose_annotation_offset(
+    point: dict[str, Any],
+    placed_points: list[tuple[float, float]],
+) -> tuple[tuple[int, int], str]:
+    candidate_offsets: list[tuple[int, int]] = [
+        (8, 8),
+        (8, -16),
+        (-92, 8),
+        (-92, -16),
+        (8, 22),
+        (8, -30),
+        (-92, 22),
+        (-92, -30),
+    ]
+    nearby_count = sum(
+        1
+        for placed_fpr, placed_tpr in placed_points
+        if abs(point["fpr"] - placed_fpr) <= 0.04 and abs(point["tpr"] - placed_tpr) <= 0.04
+    )
+    xytext = candidate_offsets[nearby_count % len(candidate_offsets)]
+    horizontal_alignment = "left" if xytext[0] >= 0 else "right"
+    return xytext, horizontal_alignment
+
+
 def _plot_multi_roc(
     curves: list[dict[str, Any]],
     doctor_points: list[dict[str, Any]],
@@ -219,24 +243,25 @@ def _plot_multi_roc(
         fpr = np.asarray(curve["roc_curve_fpr"], dtype=np.float64)
         tpr = np.asarray(curve["roc_curve_tpr"], dtype=np.float64)
         auc_value = float(curve["roc_auc"])
-        n_samples = curve.get("n_samples")
-        if n_samples is None or n_samples == 0:
-            label = f"{curve['label']} (AUC={auc_value:.4f})"
-        else:
-            label = f"{curve['label']} (AUC={auc_value:.4f}, n={n_samples})"
+        label = f"{curve['label']} (AUC={auc_value:.4f})"
         line, = plt.plot(fpr, tpr, linewidth=2, label=label)
         task_colors[str(curve.get("task_label") or curve["label"])] = line.get_color()
 
-    for point in doctor_points:
+    placed_doctor_points: list[tuple[float, float]] = []
+    for point in sorted(doctor_points, key=lambda item: (float(item["fpr"]), float(item["tpr"]))):
         point_color = task_colors.get(str(point.get("task_label") or ""))
         plt.scatter(point["fpr"], point["tpr"], s=70, marker="o", color=point_color, zorder=5)
+        xytext, horizontal_alignment = _choose_annotation_offset(point, placed_doctor_points)
         plt.annotate(
             _build_doctor_display_label(point),
             (point["fpr"], point["tpr"]),
             textcoords="offset points",
-            xytext=(6, 6),
+            xytext=xytext,
             fontsize=10,
+            ha=horizontal_alignment,
+            bbox={"boxstyle": "round,pad=0.2", "facecolor": "white", "edgecolor": "none", "alpha": 0.75},
         )
+        placed_doctor_points.append((float(point["fpr"]), float(point["tpr"])))
 
     plt.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="gray", label="Random")
     plt.xlim(0.0, 1.0)
