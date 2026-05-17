@@ -207,28 +207,92 @@ def _build_doctor_display_label(point: dict[str, Any]) -> str:
     return f"{label} (Acc={float(accuracy):.4f})"
 
 
-def _choose_annotation_offset(
-    point: dict[str, Any],
-    placed_points: list[tuple[float, float]],
-) -> tuple[tuple[int, int], str]:
-    candidate_offsets: list[tuple[int, int]] = [
-        (8, 8),
-        (8, -16),
-        (-92, 8),
-        (-92, -16),
-        (8, 22),
-        (8, -30),
-        (-92, 22),
-        (-92, -30),
-    ]
-    nearby_count = sum(
-        1
-        for placed_fpr, placed_tpr in placed_points
-        if abs(point["fpr"] - placed_fpr) <= 0.04 and abs(point["tpr"] - placed_tpr) <= 0.04
+def _bbox_overlaps(box_a: Any, box_b: Any, padding: float = 4.0) -> bool:
+    return not (
+        box_a.x1 + padding < box_b.x0
+        or box_a.x0 - padding > box_b.x1
+        or box_a.y1 + padding < box_b.y0
+        or box_a.y0 - padding > box_b.y1
     )
-    xytext = candidate_offsets[nearby_count % len(candidate_offsets)]
-    horizontal_alignment = "left" if xytext[0] >= 0 else "right"
-    return xytext, horizontal_alignment
+
+
+def _choose_annotation_layout(
+    fig: Any,
+    ax: Any,
+    point: dict[str, Any],
+    point_color: Any,
+    label_text: str,
+    all_points: list[dict[str, Any]],
+    placed_bboxes: list[Any],
+) -> tuple[tuple[int, int], str, str]:
+    candidate_offsets: list[tuple[int, int]] = [
+        (10, 10),
+        (10, 26),
+        (10, -12),
+        (10, -28),
+        (-10, 10),
+        (-10, 26),
+        (-10, -12),
+        (-10, -28),
+        (28, 0),
+        (-28, 0),
+        (42, 16),
+        (-42, 16),
+        (42, -16),
+        (-42, -16),
+    ]
+    renderer = fig.canvas.get_renderer()
+    other_point_pixels = [
+        ax.transData.transform((float(other["fpr"]), float(other["tpr"])))
+        for other in all_points
+        if other is not point
+    ]
+
+    best_layout: tuple[tuple[int, int], str, str] | None = None
+    best_score: float | None = None
+
+    for xytext in candidate_offsets:
+        ha = "left" if xytext[0] >= 0 else "right"
+        va = "bottom" if xytext[1] >= 0 else "top"
+        annotation = ax.annotate(
+            label_text,
+            (point["fpr"], point["tpr"]),
+            textcoords="offset points",
+            xytext=xytext,
+            fontsize=10,
+            ha=ha,
+            va=va,
+            bbox={"boxstyle": "round,pad=0.2", "facecolor": "white", "edgecolor": "none", "alpha": 0.85},
+            arrowprops={"arrowstyle": "-", "color": point_color, "lw": 0.8, "alpha": 0.7},
+            annotation_clip=False,
+        )
+        fig.canvas.draw()
+        bbox = annotation.get_window_extent(renderer=renderer).expanded(1.04, 1.12)
+        annotation.remove()
+
+        overlap_penalty = sum(1 for existing_bbox in placed_bboxes if _bbox_overlaps(bbox, existing_bbox))
+        point_cover_penalty = sum(1 for px, py in other_point_pixels if bbox.contains(px, py))
+
+        axes_bbox = ax.get_window_extent(renderer=renderer)
+        outside_penalty = 0
+        if bbox.x0 < axes_bbox.x0:
+            outside_penalty += axes_bbox.x0 - bbox.x0
+        if bbox.x1 > axes_bbox.x1:
+            outside_penalty += bbox.x1 - axes_bbox.x1
+        if bbox.y0 < axes_bbox.y0:
+            outside_penalty += axes_bbox.y0 - bbox.y0
+        if bbox.y1 > axes_bbox.y1:
+            outside_penalty += bbox.y1 - axes_bbox.y1
+
+        distance_penalty = abs(xytext[0]) + abs(xytext[1]) * 0.8
+        score = overlap_penalty * 10000 + point_cover_penalty * 1000 + outside_penalty * 10 + distance_penalty
+        if best_score is None or score < best_score:
+            best_score = score
+            best_layout = (xytext, ha, va)
+
+    if best_layout is None:
+        return (10, 10), "left", "bottom"
+    return best_layout
 
 
 def _plot_multi_roc(
@@ -237,46 +301,62 @@ def _plot_multi_roc(
     output_path: Path,
     title: str,
 ) -> None:
-    plt.figure(figsize=(8, 6.5))
+    fig, ax = plt.subplots(figsize=(8, 6.5))
     task_colors: dict[str, Any] = {}
     for curve in curves:
         fpr = np.asarray(curve["roc_curve_fpr"], dtype=np.float64)
         tpr = np.asarray(curve["roc_curve_tpr"], dtype=np.float64)
         auc_value = float(curve["roc_auc"])
         label = f"{curve['label']} (AUC={auc_value:.4f})"
-        line, = plt.plot(fpr, tpr, linewidth=2, label=label)
+        line, = ax.plot(fpr, tpr, linewidth=2, label=label)
         task_colors[str(curve.get("task_label") or curve["label"])] = line.get_color()
 
-    placed_doctor_points: list[tuple[float, float]] = []
-    for point in sorted(doctor_points, key=lambda item: (float(item["fpr"]), float(item["tpr"]))):
+    fig.canvas.draw()
+    placed_label_bboxes: list[Any] = []
+    sorted_points = sorted(doctor_points, key=lambda item: (float(item["fpr"]), float(item["tpr"])))
+    for point in sorted_points:
         point_color = task_colors.get(str(point.get("task_label") or ""))
-        plt.scatter(point["fpr"], point["tpr"], s=70, marker="o", color=point_color, zorder=5)
-        xytext, horizontal_alignment = _choose_annotation_offset(point, placed_doctor_points)
-        plt.annotate(
-            _build_doctor_display_label(point),
+        ax.scatter(point["fpr"], point["tpr"], s=70, marker="o", color=point_color, zorder=5)
+        label_text = _build_doctor_display_label(point)
+        xytext, horizontal_alignment, vertical_alignment = _choose_annotation_layout(
+            fig,
+            ax,
+            point,
+            point_color,
+            label_text,
+            sorted_points,
+            placed_label_bboxes,
+        )
+        annotation = ax.annotate(
+            label_text,
             (point["fpr"], point["tpr"]),
             textcoords="offset points",
             xytext=xytext,
             fontsize=10,
             ha=horizontal_alignment,
-            bbox={"boxstyle": "round,pad=0.2", "facecolor": "white", "edgecolor": "none", "alpha": 0.75},
+            va=vertical_alignment,
+            bbox={"boxstyle": "round,pad=0.2", "facecolor": "white", "edgecolor": "none", "alpha": 0.85},
+            arrowprops={"arrowstyle": "-", "color": point_color, "lw": 0.8, "alpha": 0.7},
+            annotation_clip=False,
         )
-        placed_doctor_points.append((float(point["fpr"]), float(point["tpr"])))
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        placed_label_bboxes.append(annotation.get_window_extent(renderer=renderer).expanded(1.04, 1.12))
 
-    plt.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="gray", label="Random")
-    plt.xlim(0.0, 1.0)
-    plt.ylim(0.0, 1.05)
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
-    plt.title(title)
-    plt.legend(loc="lower right", fontsize=9)
-    plt.grid(True, linestyle="--", alpha=0.3)
-    plt.tight_layout()
+    ax.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="gray", label="Random")
+    ax.set_xlim(0.0, 1.0)
+    ax.set_ylim(0.0, 1.05)
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
+    ax.set_title(title)
+    ax.legend(loc="lower right", fontsize=9)
+    ax.grid(True, linestyle="--", alpha=0.3)
+    fig.tight_layout()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    fig.savefig(output_path, dpi=200, bbox_inches="tight")
     print(f"多曲线 AUROC 图已保存到: {output_path}")
-    plt.close()
+    plt.close(fig)
 
 
 def main() -> None:
