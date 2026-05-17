@@ -198,13 +198,22 @@ def _default_output_path() -> Path:
 
 
 def _build_doctor_display_label(point: dict[str, Any]) -> str:
-    metrics = point.get("metrics") or {}
-    accuracy = metrics.get("accuracy")
+    return str(point.get("short_label") or point.get("doctor_label") or point.get("label") or "")
 
-    label = point["label"]
-    if accuracy is None:
-        return label
-    return f"{label} (Acc={float(accuracy):.4f})"
+
+def _build_doctor_summary_lines(doctor_points: list[dict[str, Any]]) -> list[str]:
+    lines: list[str] = []
+    for point in doctor_points:
+        metrics = point.get("metrics") or {}
+        accuracy = metrics.get("accuracy")
+        short_label = str(point.get("short_label") or point.get("doctor_label") or point.get("label") or "")
+        full_label = str(point.get("label") or "")
+        task_label = str(point.get("task_label") or "")
+        if accuracy is None:
+            lines.append(f"{short_label}: {full_label} [{task_label}]")
+        else:
+            lines.append(f"{short_label}: {full_label} [{task_label}, Acc={float(accuracy):.4f}]")
+    return lines
 
 
 def _bbox_overlaps(box_a: Any, box_b: Any, padding: float = 4.0) -> bool:
@@ -333,15 +342,30 @@ def _plot_multi_roc(
             textcoords="offset points",
             xytext=xytext,
             fontsize=10,
+            fontweight="bold",
             ha=horizontal_alignment,
             va=vertical_alignment,
-            bbox={"boxstyle": "round,pad=0.2", "facecolor": "white", "edgecolor": "none", "alpha": 0.85},
+            bbox={"boxstyle": "round,pad=0.2", "facecolor": "white", "edgecolor": point_color, "linewidth": 0.8, "alpha": 0.9},
             arrowprops={"arrowstyle": "-", "color": point_color, "lw": 0.8, "alpha": 0.7},
             annotation_clip=False,
         )
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
         placed_label_bboxes.append(annotation.get_window_extent(renderer=renderer).expanded(1.04, 1.12))
+
+    summary_lines = _build_doctor_summary_lines(sorted_points)
+    if summary_lines:
+        ax.text(
+            0.015,
+            0.985,
+            "Doctor points\n" + "\n".join(summary_lines),
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=9,
+            bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "edgecolor": "lightgray", "alpha": 0.92},
+            zorder=6,
+        )
 
     ax.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="gray", label="Random")
     ax.set_xlim(0.0, 1.0)
@@ -398,6 +422,11 @@ def main() -> None:
     if doctor_json_path is not None:
         loaded_points = _load_doctor_points(doctor_json_path)
         doctor_points = [point for point in loaded_points if point.get("task_label") in curve_task_labels]
+        for index, point in enumerate(
+            sorted(doctor_points, key=lambda item: (str(item.get("task_label") or ""), str(item.get("doctor_label") or ""), str(item.get("label") or ""))),
+            start=1,
+        ):
+            point["short_label"] = f"D{index}"
         print(f"已加载医生点: {len(doctor_points)} / {len(loaded_points)} | source={doctor_json_path}")
 
     _plot_multi_roc(curves, doctor_points, output_path, args.title)
