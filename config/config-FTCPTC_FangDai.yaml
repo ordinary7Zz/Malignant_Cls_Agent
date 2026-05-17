@@ -107,7 +107,7 @@ data:
 
 # Output Configuration (输出配置)
 output:
-  output_dir: "./output/test_dataset/FTCPTC/no_sllm"
+  output_dir: "./output/test_dataset/FTCPTC/no_llm"
 
 # Agent Configuration
 agent:
