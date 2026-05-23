@@ -53,7 +53,7 @@ models:
           auc: 0.7191
     - name: "dino_unet"  # 这个用来作为dinounet的单模型性能
       enable: true
-      model_path: "weights/dino_unet/FangDai/dino_unet_train_multitask_FTCPTC_FangDai_FTCPTC_epoch_8.pth"
+      model_path: "weights/dino_unet/FangDai/dino_unet_train_multitask_FTCPTC_FangDai_FTCPTC_epoch_14.pth"
       use_tirads: false  # true: 使用 TI-RADS 分类, false: 使用良恶性分类
       # 在多个测试集上的性能
       test_set_performance:
