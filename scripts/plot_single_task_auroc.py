@@ -395,10 +395,10 @@ def _plot_single_task_roc(
 def plot_single_task_auroc(
     input_paths: list[Path],
     labels: list[str],
-    doctor_json_path: Path,
-    task_label: str,
     output_path: Path,
     title: str,
+    doctor_json_path: Path | None = None,
+    task_label: str | None = None,
     doctor_labels: list[str] | None = None,
     doctor_point_color: str = "black",
 ) -> None:
@@ -417,14 +417,18 @@ def plot_single_task_auroc(
         curves.append(payload)
         print(f"已加载曲线: {label} | schema={payload['schema']} | AUC={float(payload['roc_auc']):.4f}")
 
-    loaded_points = _load_doctor_points(doctor_json_path)
-    doctor_points = _filter_doctor_points_for_task(loaded_points, task_label, doctor_labels)
-    for index, point in enumerate(
-        sorted(doctor_points, key=lambda item: (str(item.get("doctor_label") or ""), str(item.get("label") or ""))),
-        start=1,
-    ):
-        point["short_label"] = f"D{index}"
-    print(f"已加载医生点: {len(doctor_points)} / {len(loaded_points)} | task={task_label} | source={doctor_json_path}")
+    doctor_points: list[dict[str, Any]] = []
+    if doctor_json_path is not None:
+        if not task_label:
+            raise ValueError("传入 --doctor-json 时必须同时传入 --task-label。")
+        loaded_points = _load_doctor_points(doctor_json_path)
+        doctor_points = _filter_doctor_points_for_task(loaded_points, task_label, doctor_labels)
+        for index, point in enumerate(
+            sorted(doctor_points, key=lambda item: (str(item.get("doctor_label") or ""), str(item.get("label") or ""))),
+            start=1,
+        ):
+            point["short_label"] = f"D{index}"
+        print(f"已加载医生点: {len(doctor_points)} / {len(loaded_points)} | task={task_label} | source={doctor_json_path}")
 
     _plot_single_task_roc(curves, doctor_points, output_path, title, doctor_point_color)
 
@@ -434,11 +438,11 @@ def _default_output_path() -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="绘制单个任务下两个方法的 AUROC 曲线，并叠加该任务的医生读片点")
+    parser = argparse.ArgumentParser(description="绘制单个任务下两个方法的 AUROC 曲线，并可选叠加该任务的医生读片点")
     parser.add_argument("--inputs", nargs=2, required=True, help="两个 results_*.json 文件路径")
     parser.add_argument("--labels", nargs=2, required=True, help="两个方法名称，例如 ThyroidAgent BestSingleModel")
-    parser.add_argument("--doctor-json", required=True, help="医生读片性能 JSON 路径，例如 doctor_multi_task_metrics.json")
-    parser.add_argument("--task-label", required=True, help="医生性能 JSON 中对应的任务名，例如 BM")
+    parser.add_argument("--doctor-json", default=None, help="医生读片性能 JSON 路径，可选，例如 doctor_multi_task_metrics.json")
+    parser.add_argument("--task-label", default=None, help="医生性能 JSON 中对应的任务名；传入 --doctor-json 时必填，例如 BM")
     parser.add_argument("--doctor-labels", nargs="*", default=None, help="可选，指定要展示的医生标签列表")
     parser.add_argument("--doctor-color", default="black", help="医生点颜色，默认 black")
     parser.add_argument("--output", default=None, help="输出图片路径，可选；默认保存为当前运行目录下的 single_task_auroc.png")
@@ -450,18 +454,18 @@ def main() -> None:
         if not path.is_file():
             raise FileNotFoundError(f"未找到 results JSON: {path}")
 
-    doctor_json_path = Path(args.doctor_json).resolve()
-    if not doctor_json_path.is_file():
+    doctor_json_path = Path(args.doctor_json).resolve() if args.doctor_json else None
+    if doctor_json_path is not None and not doctor_json_path.is_file():
         raise FileNotFoundError(f"未找到医生性能 JSON: {doctor_json_path}")
 
     output_path = Path(args.output).resolve() if args.output else _default_output_path()
     plot_single_task_auroc(
         input_paths=input_paths,
         labels=args.labels,
-        doctor_json_path=doctor_json_path,
-        task_label=args.task_label,
         output_path=output_path,
         title=args.title,
+        doctor_json_path=doctor_json_path,
+        task_label=args.task_label,
         doctor_labels=args.doctor_labels,
         doctor_point_color=args.doctor_color,
     )
