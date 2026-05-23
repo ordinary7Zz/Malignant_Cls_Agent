@@ -35,7 +35,7 @@ models:
   dino_unet:
     - name: "dino_unet"  # 模型名称
       enable: true
-      model_path: "weights/dino_unet/LymphUs_fake/dino_unet_train_multitask_LNM_CN01_LymphUs_LNM_CN01_epoch_20.pth"
+      model_path: "weights/dino_unet/LymphUs_fake/dino_unet_train_multitask_LNMCN01_LymphUs_LNM_CN01_epoch_20.pth"
       use_tirads: false  # true: 使用 TI-RADS 分类, false: 使用良恶性分类
       # 在多个测试集上的性能
       test_set_performance:
