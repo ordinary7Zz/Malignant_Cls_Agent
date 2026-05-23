@@ -89,7 +89,7 @@ models:
 
   pathology_subtype_resnet:
     - name: "tiger-model-resnet"
-      enable: true
+      enable: false
       pth_path: "weights/tiger-model-resnet/epoch_023_Thyroid_PTC_vs_FTC_json_V0.658_T0.511.pth"  # 请改为实际 state_dict 路径
       architecture: "resnet"
       # 在多个测试集上的性能
