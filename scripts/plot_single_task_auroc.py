@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-NATURE_CURVE_COLORS = ("#0072B2", "#D55E00")
+NATURE_CURVE_COLORS = ("#0072B2", "#D55E00", "#009E73", "#CC79A7", "#56B4E9", "#E69F00")
 NATURE_RANDOM_COLOR = "#BFBFBF"
 NATURE_DOCTOR_COLOR = "#222222"
 
@@ -436,10 +436,10 @@ def plot_single_task_auroc(
     doctor_labels: list[str] | None = None,
     doctor_point_color: str = NATURE_DOCTOR_COLOR,
 ) -> None:
-    if len(input_paths) != 2:
-        raise ValueError("该脚本要求恰好传入两个 results JSON。")
-    if len(labels) != 2:
-        raise ValueError("该脚本要求恰好传入两个方法名称。")
+    if not input_paths:
+        raise ValueError("至少需要传入一个 results JSON。")
+    if len(input_paths) != len(labels):
+        raise ValueError("results JSON 的数量必须与方法名称数量一致。")
 
     curves: list[dict[str, Any]] = []
     for path, label in zip(input_paths, labels):
@@ -472,9 +472,9 @@ def _default_output_path() -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="绘制单个任务下两个方法的 AUROC 曲线，并可选叠加该任务的医生读片点")
-    parser.add_argument("--inputs", nargs=2, required=True, help="两个 results_*.json 文件路径")
-    parser.add_argument("--labels", nargs=2, required=True, help="两个方法名称，例如 ThyroidAgent BestSingleModel")
+    parser = argparse.ArgumentParser(description="绘制单个任务下一个或多个方法的 AUROC 曲线，并可选叠加该任务的医生读片点")
+    parser.add_argument("--inputs", nargs="+", required=True, help="一个或多个 results_*.json 文件路径")
+    parser.add_argument("--labels", nargs="+", required=True, help="与输入文件一一对应的方法名称列表")
     parser.add_argument("--doctor-json", default=None, help="医生读片性能 JSON 路径，可选，例如 doctor_multi_task_metrics.json")
     parser.add_argument("--task-label", default=None, help="医生性能 JSON 中对应的任务名；传入 --doctor-json 时必填，例如 BM")
     parser.add_argument("--doctor-labels", nargs="*", default=None, help="可选，指定要展示的医生标签列表")
