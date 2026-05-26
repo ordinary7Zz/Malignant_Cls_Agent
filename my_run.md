@@ -396,3 +396,33 @@ python scripts/evaluate_doctor_csv.py \
 
 - 技术上可以画在同一张图中
 - 但只有在任务语义一致时，比较才有实际意义
+
+
+BM的最好单体方法和Agent对比
+```json
+python scripts/plot_single_task_auroc.py \
+  --inputs /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/output/500_TestData_Malignancy_Cls/no_llm/results_20260503_201231.json /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/output/500_TestData_Malignancy_Cls/no_llm_single_model/results_20260522_215423.json \
+  --labels ThyroidAgent BestSingleModel \
+  --doctor-json ./doctor_multi_task_metrics.json \
+  --task-label BM \
+  --output output/figures/BM_auroc.png \
+  --title "BM (Benign/Malignant) AUROC Comparison"
+```
+
+LNM的最好单体方法和Agent对比
+```json
+python scripts/plot_single_task_auroc.py \
+  --inputs /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/output/test_dataset/LymphUs/results_20260517_160351.json /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/output/test_dataset/LymphUs/SingleModel/results_20260523_223045.json \
+  --labels ThyroidAgent BestSingleModel \
+  --output output/figures/LNMCN01_auroc.png \
+  --title "LNM AUROC Comparison"
+```
+
+FTCPTC的最好单体方法和Agent对比
+```json
+python scripts/plot_single_task_auroc.py \
+  --inputs /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/output/test_dataset/FTCPTC/no_llm/results_20260517_160122.json /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/output/test_dataset/FTCPTC/no_llm_SingleModel/results_20260523_234359.json \
+  --labels ThyroidAgent BestSingleModel \
+  --output output/figures/FTCPTC_auroc.png \
+  --title "FTCPTC AUROC Comparison"
+```

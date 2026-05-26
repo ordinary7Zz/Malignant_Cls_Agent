@@ -5,8 +5,41 @@ import json
 from pathlib import Path
 from typing import Any
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+
+
+NATURE_CURVE_COLORS = ("#0072B2", "#D55E00")
+NATURE_RANDOM_COLOR = "#BFBFBF"
+NATURE_DOCTOR_COLOR = "#222222"
+
+
+def _apply_nature_style() -> None:
+    mpl.rcParams.update(
+        {
+            "font.family": "sans-serif",
+            "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
+            "font.size": 8,
+            "axes.labelsize": 8,
+            "axes.titlesize": 8,
+            "legend.fontsize": 7,
+            "xtick.labelsize": 7,
+            "ytick.labelsize": 7,
+            "axes.linewidth": 0.8,
+            "xtick.major.width": 0.8,
+            "ytick.major.width": 0.8,
+            "xtick.major.size": 3.0,
+            "ytick.major.size": 3.0,
+            "xtick.direction": "out",
+            "ytick.direction": "out",
+            "lines.linewidth": 1.6,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "svg.fonttype": "none",
+            "savefig.transparent": False,
+        }
+    )
 
 
 def _load_json(path: Path) -> Any:
@@ -212,22 +245,7 @@ def _build_doctor_display_label(point: dict[str, Any]) -> str:
     return str(point.get("short_label") or point.get("doctor_label") or point.get("label") or "")
 
 
-def _build_doctor_summary_lines(doctor_points: list[dict[str, Any]]) -> list[str]:
-    lines: list[str] = []
-    for point in doctor_points:
-        metrics = point.get("metrics") or {}
-        accuracy = metrics.get("accuracy")
-        short_label = str(point.get("short_label") or point.get("doctor_label") or point.get("label") or "")
-        full_label = str(point.get("label") or "")
-        task_label = str(point.get("task_label") or "")
-        if accuracy is None:
-            lines.append(f"{short_label}: {full_label} [{task_label}]")
-        else:
-            lines.append(f"{short_label}: {full_label} [{task_label}, Acc={float(accuracy):.4f}]")
-    return lines
-
-
-def _bbox_overlaps(box_a: Any, box_b: Any, padding: float = 4.0) -> bool:
+def _bbox_overlaps(box_a: Any, box_b: Any, padding: float = 2.0) -> bool:
     return not (
         box_a.x1 + padding < box_b.x0
         or box_a.x0 - padding > box_b.x1
@@ -246,20 +264,20 @@ def _choose_annotation_layout(
     placed_bboxes: list[Any],
 ) -> tuple[tuple[int, int], str, str]:
     candidate_offsets: list[tuple[int, int]] = [
-        (10, 10),
-        (10, 26),
-        (10, -12),
-        (10, -28),
-        (-10, 10),
-        (-10, 26),
-        (-10, -12),
-        (-10, -28),
-        (28, 0),
-        (-28, 0),
-        (42, 16),
-        (-42, 16),
-        (42, -16),
-        (-42, -16),
+        (5, 5),
+        (5, 11),
+        (5, -7),
+        (5, -13),
+        (-5, 5),
+        (-5, 11),
+        (-5, -7),
+        (-5, -13),
+        (12, 0),
+        (-12, 0),
+        (18, 8),
+        (-18, 8),
+        (18, -8),
+        (-18, -8),
     ]
     renderer = fig.canvas.get_renderer()
     other_point_pixels = [
@@ -279,22 +297,23 @@ def _choose_annotation_layout(
             (point["fpr"], point["tpr"]),
             textcoords="offset points",
             xytext=xytext,
-            fontsize=10,
+            fontsize=7,
             ha=ha,
             va=va,
-            bbox={"boxstyle": "round,pad=0.2", "facecolor": "white", "edgecolor": "none", "alpha": 0.85},
-            arrowprops={"arrowstyle": "-", "color": point_color, "lw": 0.8, "alpha": 0.7},
+            color=point_color,
+            bbox={"boxstyle": "square,pad=0.05", "facecolor": "white", "edgecolor": "none", "alpha": 0.9},
+            arrowprops={"arrowstyle": "-", "color": point_color, "lw": 0.5, "alpha": 0.7},
             annotation_clip=False,
         )
         fig.canvas.draw()
-        bbox = annotation.get_window_extent(renderer=renderer).expanded(1.04, 1.12)
+        bbox = annotation.get_window_extent(renderer=renderer).expanded(1.03, 1.08)
         annotation.remove()
 
         overlap_penalty = sum(1 for existing_bbox in placed_bboxes if _bbox_overlaps(bbox, existing_bbox))
         point_cover_penalty = sum(1 for px, py in other_point_pixels if bbox.contains(px, py))
 
         axes_bbox = ax.get_window_extent(renderer=renderer)
-        outside_penalty = 0
+        outside_penalty = 0.0
         if bbox.x0 < axes_bbox.x0:
             outside_penalty += axes_bbox.x0 - bbox.x0
         if bbox.x1 > axes_bbox.x1:
@@ -311,8 +330,14 @@ def _choose_annotation_layout(
             best_layout = (xytext, ha, va)
 
     if best_layout is None:
-        return (10, 10), "left", "bottom"
+        return (5, 5), "left", "bottom"
     return best_layout
+
+
+def _resolve_curve_color(index: int) -> str:
+    if index < len(NATURE_CURVE_COLORS):
+        return NATURE_CURVE_COLORS[index]
+    return NATURE_CURVE_COLORS[index % len(NATURE_CURVE_COLORS)]
 
 
 def _plot_single_task_roc(
@@ -320,21 +345,35 @@ def _plot_single_task_roc(
     doctor_points: list[dict[str, Any]],
     output_path: Path,
     title: str,
-    doctor_point_color: Any = "black",
+    doctor_point_color: Any = NATURE_DOCTOR_COLOR,
 ) -> None:
-    fig, ax = plt.subplots(figsize=(8, 6.5))
-    for curve in curves:
+    _apply_nature_style()
+
+    fig, ax = plt.subplots(figsize=(3.35, 3.15))
+    ax.set_box_aspect(1)
+
+    for index, curve in enumerate(curves):
         fpr = np.asarray(curve["roc_curve_fpr"], dtype=np.float64)
         tpr = np.asarray(curve["roc_curve_tpr"], dtype=np.float64)
         auc_value = float(curve["roc_auc"])
-        label = f"{curve['label']} (AUC={auc_value:.4f})"
-        ax.plot(fpr, tpr, linewidth=2, label=label)
+        curve_color = _resolve_curve_color(index)
+        label = f"{curve['label']} (AUC {auc_value:.3f})"
+        ax.plot(fpr, tpr, color=curve_color, linewidth=1.8, label=label, solid_capstyle="round")
 
     fig.canvas.draw()
     placed_label_bboxes: list[Any] = []
     sorted_points = sorted(doctor_points, key=lambda item: (float(item["fpr"]), float(item["tpr"])))
     for point in sorted_points:
-        ax.scatter(point["fpr"], point["tpr"], s=70, marker="o", color=doctor_point_color, zorder=5)
+        ax.scatter(
+            point["fpr"],
+            point["tpr"],
+            s=18,
+            marker="o",
+            facecolor=doctor_point_color,
+            edgecolor=doctor_point_color,
+            linewidth=0.5,
+            zorder=5,
+        )
         label_text = _build_doctor_display_label(point)
         xytext, horizontal_alignment, vertical_alignment = _choose_annotation_layout(
             fig,
@@ -350,44 +389,39 @@ def _plot_single_task_roc(
             (point["fpr"], point["tpr"]),
             textcoords="offset points",
             xytext=xytext,
-            fontsize=10,
-            fontweight="bold",
+            fontsize=7,
             ha=horizontal_alignment,
             va=vertical_alignment,
-            bbox={"boxstyle": "round,pad=0.2", "facecolor": "white", "edgecolor": doctor_point_color, "linewidth": 0.8, "alpha": 0.9},
-            arrowprops={"arrowstyle": "-", "color": doctor_point_color, "lw": 0.8, "alpha": 0.7},
+            color=doctor_point_color,
+            bbox={"boxstyle": "square,pad=0.05", "facecolor": "white", "edgecolor": "none", "alpha": 0.9},
+            arrowprops={"arrowstyle": "-", "color": doctor_point_color, "lw": 0.5, "alpha": 0.7},
             annotation_clip=False,
         )
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
-        placed_label_bboxes.append(annotation.get_window_extent(renderer=renderer).expanded(1.04, 1.12))
+        placed_label_bboxes.append(annotation.get_window_extent(renderer=renderer).expanded(1.03, 1.08))
 
-    summary_lines = _build_doctor_summary_lines(sorted_points)
-    if summary_lines:
-        ax.text(
-            0.015,
-            0.985,
-            "Doctor points\n" + "\n".join(summary_lines),
-            transform=ax.transAxes,
-            ha="left",
-            va="top",
-            fontsize=9,
-            bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "edgecolor": "lightgray", "alpha": 0.92},
-            zorder=6,
-        )
-
-    ax.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="gray", label="Random")
+    ax.plot([0, 1], [0, 1], linestyle=(0, (3, 2)), linewidth=0.8, color=NATURE_RANDOM_COLOR, label="Random")
     ax.set_xlim(0.0, 1.0)
-    ax.set_ylim(0.0, 1.05)
-    ax.set_xlabel("False Positive Rate")
-    ax.set_ylabel("True Positive Rate")
-    ax.set_title(title)
-    ax.legend(loc="lower right", fontsize=9)
-    ax.grid(True, linestyle="--", alpha=0.3)
-    fig.tight_layout()
+    ax.set_ylim(0.0, 1.0)
+    ax.set_xticks(np.linspace(0.0, 1.0, 6))
+    ax.set_yticks(np.linspace(0.0, 1.0, 6))
+    ax.set_xlabel("False positive rate")
+    ax.set_ylabel("True positive rate")
+    if title:
+        ax.set_title(title, pad=4)
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.tick_params(axis="both", which="both", direction="out", length=3, width=0.8)
+    ax.legend(loc="lower right", frameon=False, handlelength=1.8, borderaxespad=0.2)
+    fig.tight_layout(pad=0.4)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    save_kwargs: dict[str, Any] = {"bbox_inches": "tight", "facecolor": "white"}
+    if output_path.suffix.lower() in {".png", ".jpg", ".jpeg", ".tif", ".tiff"}:
+        save_kwargs["dpi"] = 600
+    fig.savefig(output_path, **save_kwargs)
     print(f"单任务 AUROC 图已保存到: {output_path}")
     plt.close(fig)
 
@@ -400,7 +434,7 @@ def plot_single_task_auroc(
     doctor_json_path: Path | None = None,
     task_label: str | None = None,
     doctor_labels: list[str] | None = None,
-    doctor_point_color: str = "black",
+    doctor_point_color: str = NATURE_DOCTOR_COLOR,
 ) -> None:
     if len(input_paths) != 2:
         raise ValueError("该脚本要求恰好传入两个 results JSON。")
@@ -434,7 +468,7 @@ def plot_single_task_auroc(
 
 
 def _default_output_path() -> Path:
-    return Path.cwd() / "single_task_auroc.png"
+    return Path.cwd() / "single_task_auroc.pdf"
 
 
 def main() -> None:
@@ -444,9 +478,9 @@ def main() -> None:
     parser.add_argument("--doctor-json", default=None, help="医生读片性能 JSON 路径，可选，例如 doctor_multi_task_metrics.json")
     parser.add_argument("--task-label", default=None, help="医生性能 JSON 中对应的任务名；传入 --doctor-json 时必填，例如 BM")
     parser.add_argument("--doctor-labels", nargs="*", default=None, help="可选，指定要展示的医生标签列表")
-    parser.add_argument("--doctor-color", default="black", help="医生点颜色，默认 black")
-    parser.add_argument("--output", default=None, help="输出图片路径，可选；默认保存为当前运行目录下的 single_task_auroc.png")
-    parser.add_argument("--title", default="Single-Task AUROC Comparison", help="图标题")
+    parser.add_argument("--doctor-color", default=NATURE_DOCTOR_COLOR, help="医生点颜色，默认使用接近 Nature 风格的深灰色")
+    parser.add_argument("--output", default=None, help="输出图片路径，可选；默认保存为当前运行目录下的 single_task_auroc.pdf")
+    parser.add_argument("--title", default="", help="图标题；默认不显示标题以贴近期刊主图风格")
     args = parser.parse_args()
 
     input_paths = [Path(p).resolve() for p in args.inputs]
