@@ -401,8 +401,17 @@ python scripts/evaluate_doctor_csv.py \
 BM的最好单体方法和Agent对比
 ```json
 python scripts/plot_single_task_auroc.py \
-  --inputs /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/output/500_TestData_Malignancy_Cls/no_llm/results_20260503_201231.json /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/output/500_TestData_Malignancy_Cls/no_llm_single_model/results_20260522_215423.json \
-  --labels ThyroidAgent BestSingleModel \
+  --inputs 
+  /mnt/wangbd8/workspace/ThyroidAgent/dino_unet_multitask/resnet50/infer_auroc/BM/plot_single_task_auroc_results.json
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/RepViT/test_log/auroc_json/BM__2026_02_26_21_16_50__predictions.json
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/lsnet/outputs/thyroid_auroc_json/bm_model_BM.json
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/lsnet/outputs/thyroid_auroc_json/lsnet_t_BM.json
+  /mnt/wangbd8/workspace/ThyroidAgent/UltraFedFM/output_dir/dataset_3_cls_experiment/log_2026-02-27_18:47:44/eval_BM_2026-05-27_17:22:48/auroc_results.json
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/ft/medgemma_500BM_ft_preds_json.json
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/ft/qwen3_500BM_ft_preds_json.json
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/output/500_TestData_Malignancy_Cls/no_llm/results_20260503_201231.json 
+  \
+  --labels ResNet-50 RepViT LSNet UltraFedFM MedGemma Qwen3-VL-8B-Instruct ThyroidAgent \
   --doctor-json ./doctor_multi_task_metrics.json \
   --task-label BM \
   --output output/figures/BM_auroc.png \
@@ -412,8 +421,10 @@ python scripts/plot_single_task_auroc.py \
 LNM的最好单体方法和Agent对比
 ```json
 python scripts/plot_single_task_auroc.py \
-  --inputs /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/output/test_dataset/LymphUs/results_20260517_160351.json /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/output/test_dataset/LymphUs/SingleModel/results_20260523_223045.json \
-  --labels ThyroidAgent BestSingleModel \
+  --inputs
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/lsnet/outputs/thyroid_auroc_json/lnm_cn01_model_LNM_CN01.json
+  \
+  --labels LSNet \
   --output output/figures/LNMCN01_auroc.png \
   --title "LNM AUROC Comparison"
 ```
@@ -421,8 +432,10 @@ python scripts/plot_single_task_auroc.py \
 FTCPTC的最好单体方法和Agent对比
 ```json
 python scripts/plot_single_task_auroc.py \
-  --inputs /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/output/test_dataset/FTCPTC/no_llm/results_20260517_160122.json /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/output/test_dataset/FTCPTC/no_llm_SingleModel/results_20260523_234359.json \
-  --labels ThyroidAgent BestSingleModel \
+  --inputs 
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/lsnet/outputs/thyroid_auroc_json/ftcptc_model_FTCPTC.json
+  \
+  --labels LSNet \
   --output output/figures/FTCPTC_auroc.png \
   --title "FTCPTC AUROC Comparison"
 ```
