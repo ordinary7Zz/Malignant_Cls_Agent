@@ -473,8 +473,8 @@ def _default_output_path() -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="绘制单个任务下一个或多个方法的 AUROC 曲线，并可选叠加该任务的医生读片点")
-    parser.add_argument("--inputs", nargs="+", required=True, help="一个或多个 results_*.json 文件路径")
-    parser.add_argument("--labels", nargs="+", required=True, help="与输入文件一一对应的方法名称列表")
+    parser.add_argument("--inputs", nargs="*", required=True, action="extend", help="一个或多个 results_*.json 文件路径")
+    parser.add_argument("--labels", nargs="*", required=True, action="extend", help="与输入文件一一对应的方法名称列表")
     parser.add_argument("--doctor-json", default=None, help="医生读片性能 JSON 路径，可选，例如 doctor_multi_task_metrics.json")
     parser.add_argument("--task-label", default=None, help="医生性能 JSON 中对应的任务名；传入 --doctor-json 时必填，例如 BM")
     parser.add_argument("--doctor-labels", nargs="*", default=None, help="可选，指定要展示的医生标签列表")
