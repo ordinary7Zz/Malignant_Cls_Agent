@@ -349,9 +349,11 @@ def _resolve_curve_color(index: int) -> str:
     return NATURE_CURVE_COLORS[index % len(NATURE_CURVE_COLORS)]
 
 
-def _resolve_curve_alpha(auc_value: float) -> float:
-    auc_clamped = float(np.clip(auc_value, 0.5, 1.0))
-    return float(np.clip(0.35 + (auc_clamped - 0.5) * 1.3, 0.35, 1.0))
+def _resolve_curve_alpha(auc_value: float, min_auc: float, max_auc: float) -> float:
+    if max_auc <= min_auc:
+        return 0.9
+    normalized = (float(auc_value) - min_auc) / (max_auc - min_auc)
+    return float(np.clip(0.22 + (normalized ** 1.4) * 0.78, 0.22, 1.0))
 
 
 def _plot_single_task_roc(
@@ -366,12 +368,16 @@ def _plot_single_task_roc(
     fig, ax = plt.subplots(figsize=(3.35, 3.15))
     ax.set_box_aspect(1)
 
+    auc_values = [float(curve["roc_auc"]) for curve in curves]
+    min_auc = min(auc_values)
+    max_auc = max(auc_values)
+
     for index, curve in enumerate(curves):
         fpr = np.asarray(curve["roc_curve_fpr"], dtype=np.float64)
         tpr = np.asarray(curve["roc_curve_tpr"], dtype=np.float64)
         auc_value = float(curve["roc_auc"])
         curve_color = _resolve_curve_color(index)
-        curve_alpha = _resolve_curve_alpha(auc_value)
+        curve_alpha = _resolve_curve_alpha(auc_value, min_auc, max_auc)
         label = f"{curve['label']} ({auc_value:.3f})"
         ax.plot(fpr, tpr, color=curve_color, alpha=curve_alpha, linewidth=1.8, label=label, solid_capstyle="round")
 
