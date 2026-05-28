@@ -10,7 +10,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-NATURE_CURVE_COLORS = ("#0072B2", "#D55E00", "#009E73", "#CC79A7", "#56B4E9", "#E69F00")
+NATURE_CURVE_COLORS = (
+    "#4E79A7",
+    "#F28E2B",
+    "#59A14F",
+    "#E15759",
+    "#76B7B2",
+    "#EDC948",
+    "#B07AA1",
+    "#9C755F",
+)
 NATURE_RANDOM_COLOR = "#BFBFBF"
 NATURE_DOCTOR_COLOR = "#222222"
 
@@ -340,6 +349,11 @@ def _resolve_curve_color(index: int) -> str:
     return NATURE_CURVE_COLORS[index % len(NATURE_CURVE_COLORS)]
 
 
+def _resolve_curve_alpha(auc_value: float) -> float:
+    auc_clamped = float(np.clip(auc_value, 0.5, 1.0))
+    return float(np.clip(0.35 + (auc_clamped - 0.5) * 1.3, 0.35, 1.0))
+
+
 def _plot_single_task_roc(
     curves: list[dict[str, Any]],
     doctor_points: list[dict[str, Any]],
@@ -357,8 +371,9 @@ def _plot_single_task_roc(
         tpr = np.asarray(curve["roc_curve_tpr"], dtype=np.float64)
         auc_value = float(curve["roc_auc"])
         curve_color = _resolve_curve_color(index)
-        label = f"{curve['label']} (AUC {auc_value:.3f})"
-        ax.plot(fpr, tpr, color=curve_color, linewidth=1.8, label=label, solid_capstyle="round")
+        curve_alpha = _resolve_curve_alpha(auc_value)
+        label = f"{curve['label']} ({auc_value:.3f})"
+        ax.plot(fpr, tpr, color=curve_color, alpha=curve_alpha, linewidth=1.8, label=label, solid_capstyle="round")
 
     fig.canvas.draw()
     placed_label_bboxes: list[Any] = []
