@@ -428,6 +428,18 @@ python scripts/plot_single_task_auroc.py \
   --labels LLNM-Net RepViT LSNet UltraFedFM MedGemma Qwen3-VL-8B-Instruct ThyroidAgent \
   --output output/figures/LNMCN01_auroc.png \
   --title "LNM AUROC Comparison"
+
+python scripts/plot_single_task_auprc.py \
+  --inputs /mnt/wangbd8/workspace/ThyroidAgent/LLNM-Net/new_code/runs/evaluate/eval_results_auroc.json \
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/RepViT/test_log/auroc_json/LNMCN01__repvit_m1_0_224_0.025_0.001_0.25__predictions.json \
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Models/lsnet/outputs/thyroid_auroc_json/lnm_cn01_model_LNM_CN01.json \
+  /mnt/wangbd8/workspace/ThyroidAgent/UltraFedFM/output_dir/LNMCN01_train/log_2026-05-28_05:10:07/eval_LNM_CN01_2026-05-27_23:38:19/auroc_results.json \
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/medgemma/ft/medgemma_LNMCN01_ft_preds_json.json \
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/ft/qwen3_LNMCN01_ft_preds_json.json \
+  /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/output/test_dataset/LymphUs/results_20260517_160351.json \
+  --labels LLNM-Net RepViT LSNet UltraFedFM MedGemma Qwen3-VL-8B-Instruct ThyroidAgent \
+  --output output/figures/LNMCN01_auroc.png \
+  --title "LNM AUPRC Comparison"
 ```
 
 FTCPTC - 所有模型的auroc曲线
