@@ -9,6 +9,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.lines import Line2D
+from sklearn.metrics import average_precision_score, precision_recall_curve
 
 
 NATURE_CURVE_COLORS = (
@@ -66,50 +67,29 @@ def _load_results(path: Path) -> list[dict[str, Any]]:
     return [item for item in data if isinstance(item, dict)]
 
 
-def _extract_roc_summary(records: list[dict[str, Any]]) -> dict[str, Any] | None:
-    for item in reversed(records):
-        if item.get("record_type") == "roc_summary":
-            return item
-    return None
-
-
-def _compute_roc_from_scores(y_true_arr: np.ndarray, y_prob_arr: np.ndarray) -> tuple[list[float], list[float], list[float], float]:
+def _compute_prc_from_scores(y_true_arr: np.ndarray, y_prob_arr: np.ndarray) -> tuple[list[float], list[float], list[float], float]:
     pos_total = int(np.sum(y_true_arr == 1))
     neg_total = int(np.sum(y_true_arr == 0))
     if pos_total == 0 or neg_total == 0:
-        raise ValueError("真实标签只有一个类别，无法绘制 AUROC 曲线。")
+        raise ValueError("真实标签只有一个类别，无法绘制 AUPRC 曲线。")
 
-    unique_thresholds = np.unique(y_prob_arr)[::-1]
-    thresholds = np.concatenate(([np.inf], unique_thresholds))
-
-    fpr: list[float] = []
-    tpr: list[float] = []
-    threshold_values: list[float] = []
-
-    for threshold in thresholds:
-        y_pred = (y_prob_arr >= threshold).astype(np.int32)
-        tp = int(np.sum((y_pred == 1) & (y_true_arr == 1)))
-        fp = int(np.sum((y_pred == 1) & (y_true_arr == 0)))
-        tpr.append(tp / pos_total)
-        fpr.append(fp / neg_total)
-        threshold_values.append(float(threshold))
-
-    auc_value = float(np.trapz(np.asarray(tpr, dtype=np.float64), np.asarray(fpr, dtype=np.float64)))
-    return fpr, tpr, threshold_values, auc_value
+    precision, recall, thresholds = precision_recall_curve(y_true_arr, y_prob_arr)
+    auprc_value = float(average_precision_score(y_true_arr, y_prob_arr))
+    return precision.tolist(), recall.tolist(), thresholds.tolist(), auprc_value
 
 
 def _coerce_binary_arrays(y_true: list[int], y_prob: list[float], source: Path) -> tuple[np.ndarray, np.ndarray]:
     if not y_true:
-        raise ValueError(f"未在 results JSON 中找到可用于绘制 AUROC 的样本字段: {source}")
+        raise ValueError(f"未在 results JSON 中找到可用于绘制 AUPRC 的样本字段: {source}")
 
     y_true_arr = np.asarray(y_true, dtype=np.int32)
     y_prob_arr = np.asarray(y_prob, dtype=np.float64)
     if len(np.unique(y_true_arr)) < 2:
-        raise ValueError(f"真实标签只有一个类别，无法绘制 AUROC 曲线: {source}")
+        raise ValueError(f"真实标签只有一个类别，无法绘制 AUPRC 曲线: {source}")
     return y_true_arr, y_prob_arr
 
 
-def _build_roc_from_current_schema(records: list[dict[str, Any]], source: Path) -> dict[str, Any] | None:
+def _build_prc_from_current_schema(records: list[dict[str, Any]], source: Path) -> dict[str, Any] | None:
     y_true: list[int] = []
     y_prob: list[float] = []
 
@@ -127,18 +107,20 @@ def _build_roc_from_current_schema(records: list[dict[str, Any]], source: Path) 
         return None
 
     y_true_arr, y_prob_arr = _coerce_binary_arrays(y_true, y_prob, source)
-    fpr, tpr, thresholds, auc_value = _compute_roc_from_scores(y_true_arr, y_prob_arr)
+    precision, recall, thresholds, auprc_value = _compute_prc_from_scores(y_true_arr, y_prob_arr)
+    positive_rate = float(np.mean(y_true_arr == 1))
     return {
         "schema": "current",
-        "roc_curve_fpr": fpr,
-        "roc_curve_tpr": tpr,
-        "roc_curve_thresholds": thresholds,
-        "roc_auc": auc_value,
+        "pr_curve_precision": precision,
+        "pr_curve_recall": recall,
+        "pr_curve_thresholds": thresholds,
+        "auprc": auprc_value,
+        "positive_rate": positive_rate,
         "n_samples": int(y_true_arr.shape[0]),
     }
 
 
-def _build_roc_from_classification_agent_schema(records: list[dict[str, Any]], source: Path) -> dict[str, Any] | None:
+def _build_prc_from_classification_agent_schema(records: list[dict[str, Any]], source: Path) -> dict[str, Any] | None:
     y_true: list[int] = []
     y_prob: list[float] = []
 
@@ -154,42 +136,29 @@ def _build_roc_from_classification_agent_schema(records: list[dict[str, Any]], s
         return None
 
     y_true_arr, y_prob_arr = _coerce_binary_arrays(y_true, y_prob, source)
-    fpr, tpr, thresholds, auc_value = _compute_roc_from_scores(y_true_arr, y_prob_arr)
+    precision, recall, thresholds, auprc_value = _compute_prc_from_scores(y_true_arr, y_prob_arr)
+    positive_rate = float(np.mean(y_true_arr == 1))
     return {
         "schema": "classification_agent",
-        "roc_curve_fpr": fpr,
-        "roc_curve_tpr": tpr,
-        "roc_curve_thresholds": thresholds,
-        "roc_auc": auc_value,
+        "pr_curve_precision": precision,
+        "pr_curve_recall": recall,
+        "pr_curve_thresholds": thresholds,
+        "auprc": auprc_value,
+        "positive_rate": positive_rate,
         "n_samples": int(y_true_arr.shape[0]),
     }
 
 
-def _resolve_roc_payload(records: list[dict[str, Any]], source: Path) -> dict[str, Any]:
-    summary = _extract_roc_summary(records)
-    if summary is not None:
-        fpr = summary.get("roc_curve_fpr") or []
-        tpr = summary.get("roc_curve_tpr") or []
-        auc_value = summary.get("roc_auc")
-        if fpr and tpr and auc_value is not None:
-            return {
-                "schema": "roc_summary",
-                "roc_curve_fpr": [float(v) for v in fpr],
-                "roc_curve_tpr": [float(v) for v in tpr],
-                "roc_curve_thresholds": [float(v) for v in (summary.get("roc_curve_thresholds") or [])],
-                "roc_auc": float(auc_value),
-                "n_samples": int(summary.get("n_aligned_samples", 0)) if summary.get("n_aligned_samples") is not None else None,
-            }
-
-    payload = _build_roc_from_current_schema(records, source)
+def _resolve_prc_payload(records: list[dict[str, Any]], source: Path) -> dict[str, Any]:
+    payload = _build_prc_from_current_schema(records, source)
     if payload is not None:
         return payload
 
-    payload = _build_roc_from_classification_agent_schema(records, source)
+    payload = _build_prc_from_classification_agent_schema(records, source)
     if payload is not None:
         return payload
 
-    raise ValueError(f"无法识别或提取可用于 AUROC 的字段: {source}")
+    raise ValueError(f"无法识别或提取可用于 AUPRC 的字段: {source}")
 
 
 def _load_doctor_points(path: Path) -> list[dict[str, Any]]:
@@ -207,10 +176,19 @@ def _load_doctor_points(path: Path) -> list[dict[str, Any]]:
     for item in plot_points:
         if not isinstance(item, dict):
             continue
-        roc_point = item.get("roc_point") or {}
-        fpr = roc_point.get("fpr")
-        tpr = roc_point.get("tpr")
-        if fpr is None or tpr is None:
+        metrics = item.get("metrics") or {}
+        precision = metrics.get("precision")
+        recall = metrics.get("recall")
+        if precision is None or recall is None:
+            confusion_matrix = item.get("confusion_matrix") or {}
+            tp = confusion_matrix.get("tp")
+            fp = confusion_matrix.get("fp")
+            fn = confusion_matrix.get("fn")
+            if precision is None and tp is not None and fp is not None and (tp + fp) > 0:
+                precision = float(tp) / float(tp + fp)
+            if recall is None and tp is not None and fn is not None and (tp + fn) > 0:
+                recall = float(tp) / float(tp + fn)
+        if precision is None or recall is None:
             continue
 
         task_label = str(item.get("task_label") or "")
@@ -220,10 +198,10 @@ def _load_doctor_points(path: Path) -> list[dict[str, Any]]:
                 "task_label": task_label,
                 "doctor_label": doctor_label,
                 "label": str(item.get("label") or f"{task_label} - {doctor_label}"),
-                "fpr": float(fpr),
-                "tpr": float(tpr),
+                "precision": float(precision),
+                "recall": float(recall),
                 "n_samples": item.get("n_samples"),
-                "metrics": item.get("metrics") or {},
+                "metrics": metrics,
                 "source": str(path),
             }
         )
@@ -253,116 +231,23 @@ def _filter_doctor_points_for_task(
     return filtered_points
 
 
-def _build_doctor_display_label(point: dict[str, Any]) -> str:
-    return str(point.get("short_label") or point.get("doctor_label") or point.get("label") or "")
-
-
-def _bbox_overlaps(box_a: Any, box_b: Any, padding: float = 2.0) -> bool:
-    return not (
-        box_a.x1 + padding < box_b.x0
-        or box_a.x0 - padding > box_b.x1
-        or box_a.y1 + padding < box_b.y0
-        or box_a.y0 - padding > box_b.y1
-    )
-
-
-def _choose_annotation_layout(
-    fig: Any,
-    ax: Any,
-    point: dict[str, Any],
-    point_color: Any,
-    label_text: str,
-    all_points: list[dict[str, Any]],
-    placed_bboxes: list[Any],
-) -> tuple[tuple[int, int], str, str]:
-    candidate_offsets: list[tuple[int, int]] = [
-        (5, 5),
-        (5, 11),
-        (5, -7),
-        (5, -13),
-        (-5, 5),
-        (-5, 11),
-        (-5, -7),
-        (-5, -13),
-        (12, 0),
-        (-12, 0),
-        (18, 8),
-        (-18, 8),
-        (18, -8),
-        (-18, -8),
-    ]
-    renderer = fig.canvas.get_renderer()
-    other_point_pixels = [
-        ax.transData.transform((float(other["fpr"]), float(other["tpr"])))
-        for other in all_points
-        if other is not point
-    ]
-
-    best_layout: tuple[tuple[int, int], str, str] | None = None
-    best_score: float | None = None
-
-    for xytext in candidate_offsets:
-        ha = "left" if xytext[0] >= 0 else "right"
-        va = "bottom" if xytext[1] >= 0 else "top"
-        annotation = ax.annotate(
-            label_text,
-            (point["fpr"], point["tpr"]),
-            textcoords="offset points",
-            xytext=xytext,
-            fontsize=7,
-            ha=ha,
-            va=va,
-            color=point_color,
-            bbox={"boxstyle": "square,pad=0.05", "facecolor": "white", "edgecolor": "none", "alpha": 0.9},
-            arrowprops={"arrowstyle": "-", "color": point_color, "lw": 0.5, "alpha": 0.7},
-            annotation_clip=False,
-        )
-        fig.canvas.draw()
-        bbox = annotation.get_window_extent(renderer=renderer).expanded(1.03, 1.08)
-        annotation.remove()
-
-        overlap_penalty = sum(1 for existing_bbox in placed_bboxes if _bbox_overlaps(bbox, existing_bbox))
-        point_cover_penalty = sum(1 for px, py in other_point_pixels if bbox.contains(px, py))
-
-        axes_bbox = ax.get_window_extent(renderer=renderer)
-        outside_penalty = 0.0
-        if bbox.x0 < axes_bbox.x0:
-            outside_penalty += axes_bbox.x0 - bbox.x0
-        if bbox.x1 > axes_bbox.x1:
-            outside_penalty += bbox.x1 - axes_bbox.x1
-        if bbox.y0 < axes_bbox.y0:
-            outside_penalty += axes_bbox.y0 - bbox.y0
-        if bbox.y1 > axes_bbox.y1:
-            outside_penalty += bbox.y1 - axes_bbox.y1
-
-        distance_penalty = abs(xytext[0]) + abs(xytext[1]) * 0.8
-        score = overlap_penalty * 10000 + point_cover_penalty * 1000 + outside_penalty * 10 + distance_penalty
-        if best_score is None or score < best_score:
-            best_score = score
-            best_layout = (xytext, ha, va)
-
-    if best_layout is None:
-        return (5, 5), "left", "bottom"
-    return best_layout
-
-
 def _resolve_curve_color(index: int) -> str:
     if index < len(NATURE_CURVE_COLORS):
         return NATURE_CURVE_COLORS[index]
     return NATURE_CURVE_COLORS[index % len(NATURE_CURVE_COLORS)]
 
 
-def _resolve_curve_alpha(auc_value: float, min_auc: float, max_auc: float) -> float:
-    if max_auc <= min_auc:
+def _resolve_curve_alpha(auprc_value: float, min_auprc: float, max_auprc: float) -> float:
+    if max_auprc <= min_auprc:
         return 0.9
-    normalized = (float(auc_value) - min_auc) / (max_auc - min_auc)
-    return float(np.clip(0.22 + (normalized ** 1.4) * 0.78, 0.22, 1.0))
+    normalized = (float(auprc_value) - min_auprc) / (max_auprc - min_auprc)
+    return float(np.clip(0.22 + (normalized**1.4) * 0.78, 0.22, 1.0))
 
 
-def _resolve_curve_linewidth(auc_value: float, min_auc: float, max_auc: float) -> float:
-    if max_auc <= min_auc:
+def _resolve_curve_linewidth(auprc_value: float, min_auprc: float, max_auprc: float) -> float:
+    if max_auprc <= min_auprc:
         return 1.8
-    normalized = (float(auc_value) - min_auc) / (max_auc - min_auc)
+    normalized = (float(auprc_value) - min_auprc) / (max_auprc - min_auprc)
     return float(np.clip(1.15 + normalized * 0.95, 1.15, 2.1))
 
 
@@ -388,7 +273,7 @@ def _parse_bool(value: str) -> bool:
     raise argparse.ArgumentTypeError("--curve-alpha 只能传 true 或 false")
 
 
-def _plot_single_task_roc(
+def _plot_single_task_prc(
     curves: list[dict[str, Any]],
     doctor_points: list[dict[str, Any]],
     output_path: Path,
@@ -401,20 +286,20 @@ def _plot_single_task_roc(
     fig, ax = plt.subplots(figsize=(3.35, 3.15))
     ax.set_box_aspect(1)
 
-    auc_values = [float(curve["roc_auc"]) for curve in curves]
-    min_auc = min(auc_values)
-    max_auc = max(auc_values)
+    auprc_values = [float(curve["auprc"]) for curve in curves]
+    min_auprc = min(auprc_values)
+    max_auprc = max(auprc_values)
 
-    curves_sorted = sorted(curves, key=lambda item: float(item["roc_auc"]), reverse=True)
+    curves_sorted = sorted(curves, key=lambda item: float(item["auprc"]), reverse=True)
 
     for index, curve in enumerate(curves_sorted):
-        fpr = np.asarray(curve["roc_curve_fpr"], dtype=np.float64)
-        tpr = np.asarray(curve["roc_curve_tpr"], dtype=np.float64)
-        auc_value = float(curve["roc_auc"])
+        precision = np.asarray(curve["pr_curve_precision"], dtype=np.float64)
+        recall = np.asarray(curve["pr_curve_recall"], dtype=np.float64)
+        auprc_value = float(curve["auprc"])
         curve_color = _resolve_curve_color(index)
-        curve_alpha = _resolve_curve_alpha(auc_value, min_auc, max_auc)
-        curve_linewidth = _resolve_curve_linewidth(auc_value, min_auc, max_auc)
-        label = f"{curve['label']} ({auc_value:.4f})"
+        curve_alpha = _resolve_curve_alpha(auprc_value, min_auprc, max_auprc)
+        curve_linewidth = _resolve_curve_linewidth(auprc_value, min_auprc, max_auprc)
+        label = f"{curve['label']} ({auprc_value:.4f})"
         plot_kwargs: dict[str, Any] = {
             "color": curve_color,
             "linewidth": curve_linewidth,
@@ -423,17 +308,17 @@ def _plot_single_task_roc(
         }
         if use_curve_alpha:
             plot_kwargs["alpha"] = curve_alpha
-        ax.plot(fpr, tpr, **plot_kwargs)
+        ax.plot(recall[::-1], precision[::-1], **plot_kwargs)
 
     fig.canvas.draw()
-    sorted_points = sorted(doctor_points, key=lambda item: (float(item["fpr"]), float(item["tpr"])))
+    sorted_points = sorted(doctor_points, key=lambda item: (float(item["recall"]), float(item["precision"])))
     doctor_handles: list[Line2D] = []
     for index, point in enumerate(sorted_points):
         marker = _resolve_doctor_marker(index)
         legend_label = _build_doctor_legend_label(point, index)
         ax.scatter(
-            point["fpr"],
-            point["tpr"],
+            point["recall"],
+            point["precision"],
             s=60,
             marker=marker,
             facecolor=NATURE_DOCTOR_MARKER_FACE,
@@ -477,8 +362,8 @@ def _plot_single_task_roc(
     ax.set_ylim(0.0, 1.0)
     ax.set_xticks(np.linspace(0.0, 1.0, 6))
     ax.set_yticks(np.linspace(0.0, 1.0, 6))
-    ax.set_xlabel("False positive rate")
-    ax.set_ylabel("True positive rate")
+    ax.set_xlabel("Recall")
+    ax.set_ylabel("Precision")
     if title:
         ax.set_title(title, pad=4)
 
@@ -493,11 +378,11 @@ def _plot_single_task_roc(
     if output_path.suffix.lower() in {".png", ".jpg", ".jpeg", ".tif", ".tiff"}:
         save_kwargs["dpi"] = 600
     fig.savefig(output_path, **save_kwargs)
-    print(f"单任务 AUROC 图已保存到: {output_path}")
+    print(f"单任务 AUPRC 图已保存到: {output_path}")
     plt.close(fig)
 
 
-def plot_single_task_auroc(
+def plot_single_task_auprc(
     input_paths: list[Path],
     labels: list[str],
     output_path: Path,
@@ -516,12 +401,12 @@ def plot_single_task_auroc(
     curves: list[dict[str, Any]] = []
     for path, label in zip(input_paths, labels):
         records = _load_results(path)
-        payload = _resolve_roc_payload(records, path)
+        payload = _resolve_prc_payload(records, path)
         payload["label"] = label
         payload["source"] = str(path)
         payload["task_label"] = task_label
         curves.append(payload)
-        print(f"已加载曲线: {label} | schema={payload['schema']} | AUC={float(payload['roc_auc']):.4f}")
+        print(f"已加载曲线: {label} | schema={payload['schema']} | AUPRC={float(payload['auprc']):.4f}")
 
     doctor_points: list[dict[str, Any]] = []
     if doctor_json_path is not None:
@@ -536,15 +421,15 @@ def plot_single_task_auroc(
             point["short_label"] = f"D{index}"
         print(f"已加载医生点: {len(doctor_points)} / {len(loaded_points)} | task={task_label} | source={doctor_json_path}")
 
-    _plot_single_task_roc(curves, doctor_points, output_path, title, doctor_point_color, use_curve_alpha)
+    _plot_single_task_prc(curves, doctor_points, output_path, title, doctor_point_color, use_curve_alpha)
 
 
 def _default_output_path() -> Path:
-    return Path.cwd() / "single_task_auroc.pdf"
+    return Path.cwd() / "single_task_auprc.pdf"
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="绘制单个任务下一个或多个方法的 AUROC 曲线，并可选叠加该任务的医生读片点")
+    parser = argparse.ArgumentParser(description="绘制单个任务下一个或多个方法的 AUPRC 曲线，并可选叠加该任务的医生读片点")
     parser.add_argument("--inputs", nargs="*", required=True, action="extend", help="一个或多个 results_*.json 文件路径")
     parser.add_argument("--labels", nargs="*", required=True, action="extend", help="与输入文件一一对应的方法名称列表")
     parser.add_argument("--doctor-json", default=None, help="医生读片性能 JSON 路径，可选，例如 doctor_multi_task_metrics.json")
@@ -556,9 +441,9 @@ def main() -> None:
         type=_parse_bool,
         default=True,
         metavar="BOOL",
-        help="是否按 AUC 动态设置曲线透明度，传 true 或 false；默认 true",
+        help="是否按 AUPRC 动态设置曲线透明度，传 true 或 false；默认 true",
     )
-    parser.add_argument("--output", default=None, help="输出图片路径，可选；默认保存为当前运行目录下的 single_task_auroc.pdf")
+    parser.add_argument("--output", default=None, help="输出图片路径，可选；默认保存为当前运行目录下的 single_task_auprc.pdf")
     parser.add_argument("--title", default="", help="图标题；默认不显示标题以贴近期刊主图风格")
     args = parser.parse_args()
 
@@ -572,7 +457,7 @@ def main() -> None:
         raise FileNotFoundError(f"未找到医生性能 JSON: {doctor_json_path}")
 
     output_path = Path(args.output).resolve() if args.output else _default_output_path()
-    plot_single_task_auroc(
+    plot_single_task_auprc(
         input_paths=input_paths,
         labels=args.labels,
         output_path=output_path,
@@ -583,6 +468,7 @@ def main() -> None:
         doctor_point_color=args.doctor_color,
         use_curve_alpha=args.curve_alpha,
     )
+
 
 if __name__ == "__main__":
     main()
