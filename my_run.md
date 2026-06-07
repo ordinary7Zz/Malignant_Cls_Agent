@@ -438,7 +438,7 @@ python scripts/plot_single_task_auprc.py \
   /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/ft/qwen3_LNMCN01_ft_preds_json.json \
   /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/output/test_dataset/LymphUs/results_20260517_160351.json \
   --labels LLNM-Net RepViT LSNet UltraFedFM MedGemma Qwen3-VL-8B-Instruct ThyroidAgent \
-  --output output/figures/LNMCN01_auroc.png \
+  --output output/figures/LNMCN01_auprc.png \
   --title "LNM AUPRC Comparison"
 ```
 
@@ -465,7 +465,7 @@ python scripts/plot_single_task_auprc.py \
   /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/vllms/qwen3/ft/qwen3_FTCPTC_ft_preds_json.json \
   /mnt/wangbd8/workspace/ThyroidAgent/Classification_Agent/Malignant_Cls_Agent/output/test_dataset/FTCPTC/no_llm/results_20260517_160122.json \
   --labels Tiger-Model RepViT LSNet UltraFedFM MedGemma Qwen3-VL-8B-Instruct ThyroidAgent \
-  --output output/figures/FTCPTC_auroc.png \
+  --output output/figures/FTCPTC_auprc.png \
   --title "FTCPTC AUPRC Comparison"
 ```
 

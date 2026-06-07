@@ -359,13 +359,6 @@ def _resolve_curve_alpha(auc_value: float, min_auc: float, max_auc: float) -> fl
     return float(np.clip(0.22 + (normalized ** 1.4) * 0.78, 0.22, 1.0))
 
 
-def _resolve_curve_linewidth(auc_value: float, min_auc: float, max_auc: float) -> float:
-    if max_auc <= min_auc:
-        return 1.8
-    normalized = (float(auc_value) - min_auc) / (max_auc - min_auc)
-    return float(np.clip(1.15 + normalized * 0.95, 1.15, 2.1))
-
-
 def _resolve_doctor_marker(index: int) -> str:
     if index < len(NATURE_DOCTOR_MARKERS):
         return NATURE_DOCTOR_MARKERS[index]
@@ -413,11 +406,9 @@ def _plot_single_task_roc(
         auc_value = float(curve["roc_auc"])
         curve_color = _resolve_curve_color(index)
         curve_alpha = _resolve_curve_alpha(auc_value, min_auc, max_auc)
-        curve_linewidth = _resolve_curve_linewidth(auc_value, min_auc, max_auc)
         label = f"{curve['label']} ({auc_value:.4f})"
         plot_kwargs: dict[str, Any] = {
             "color": curve_color,
-            "linewidth": curve_linewidth,
             "label": label,
             "solid_capstyle": "round",
         }
