@@ -484,7 +484,7 @@ python scripts\plot_single_task_auroc.py ^
   --task-label BM ^
   --output "output\figures\new_BM_auroc.png" ^
   --curve-alpha false ^
-  --title "BM (Benign/Malignant) AUROC Comparison"
+  --title "Benign/Malignant AUROC"
 
 python scripts\plot_single_task_auprc.py ^
   --inputs "my_json\BM\auroc_results.json" "my_json\BM\gpt5.5_BM_preds.json" "my_json\BM\gemini3.1_BM_preds.json"  "my_json\BM\results_20260503_191934_target_auroc_0p9250.json" ^
@@ -493,7 +493,7 @@ python scripts\plot_single_task_auprc.py ^
   --task-label BM ^
   --output "output\figures\new_BM_auprc.png" ^
   --curve-alpha false ^
-  --title "BM (Benign/Malignant) AUPRC Comparison"
+  --title "Benign/Malignant AUPRC"
 ```
 
 ```

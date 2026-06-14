@@ -25,6 +25,14 @@ NATURE_RANDOM_COLOR = "#BFBFBF"
 NATURE_DOCTOR_COLOR = "#222222"
 NATURE_DOCTOR_MARKER_FACE = "#F5B21A"
 NATURE_DOCTOR_MARKERS = ("^", "v")
+NATURE_FONT_SIZES = {
+    "base": 10,  # 全局基础字号，作为默认字体大小
+    "axes_label": 12,  # x/y 轴标签字号
+    "axes_title": 12,  # 图标题字号
+    "legend": 10,  # 图例字号
+    "tick": 10,  # 坐标轴刻度字号
+    "annotation": 8,  # AUROC 医生点标注字号
+}
 
 
 def _apply_nature_style() -> None:
@@ -32,12 +40,12 @@ def _apply_nature_style() -> None:
         {
             "font.family": "sans-serif",
             "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
-            "font.size": 8,
-            "axes.labelsize": 8,
-            "axes.titlesize": 8,
-            "legend.fontsize": 7,
-            "xtick.labelsize": 7,
-            "ytick.labelsize": 7,
+            "font.size": NATURE_FONT_SIZES["base"],
+            "axes.labelsize": NATURE_FONT_SIZES["axes_label"],
+            "axes.titlesize": NATURE_FONT_SIZES["axes_title"],
+            "legend.fontsize": NATURE_FONT_SIZES["legend"],
+            "xtick.labelsize": NATURE_FONT_SIZES["tick"],
+            "ytick.labelsize": NATURE_FONT_SIZES["tick"],
             "axes.linewidth": 0.8,
             "xtick.major.width": 0.8,
             "ytick.major.width": 0.8,
@@ -309,7 +317,7 @@ def _choose_annotation_layout(
             (point["fpr"], point["tpr"]),
             textcoords="offset points",
             xytext=xytext,
-            fontsize=7,
+            fontsize=NATURE_FONT_SIZES["annotation"],
             ha=ha,
             va=va,
             color=point_color,
@@ -381,6 +389,29 @@ def _parse_bool(value: str) -> bool:
     raise argparse.ArgumentTypeError("--curve-alpha 只能传 true 或 false")
 
 
+def _save_figure_outputs(fig: Any, output_path: Path) -> list[Path]:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    target_paths: list[Path] = []
+    if output_path.suffix.lower() in {".png", ".svg"}:
+        for suffix in (".png", ".svg"):
+            target_paths.append(output_path.with_suffix(suffix))
+    else:
+        target_paths.append(output_path)
+        for suffix in (".png", ".svg"):
+            target_path = output_path.with_suffix(suffix)
+            if target_path not in target_paths:
+                target_paths.append(target_path)
+
+    for target_path in target_paths:
+        save_kwargs: dict[str, Any] = {"bbox_inches": "tight", "facecolor": "white"}
+        if target_path.suffix.lower() in {".png", ".jpg", ".jpeg", ".tif", ".tiff"}:
+            save_kwargs["dpi"] = 600
+        fig.savefig(target_path, **save_kwargs)
+
+    return target_paths
+
+
 def _plot_single_task_roc(
     curves: list[dict[str, Any]],
     doctor_points: list[dict[str, Any]],
@@ -406,7 +437,7 @@ def _plot_single_task_roc(
         auc_value = float(curve["roc_auc"])
         curve_color = _resolve_curve_color(index)
         curve_alpha = _resolve_curve_alpha(auc_value, min_auc, max_auc)
-        label = f"{curve['label']} ({auc_value:.4f})"
+        label = f"{curve['label']} ({auc_value:.3f})"
         plot_kwargs: dict[str, Any] = {
             "color": curve_color,
             "label": label,
@@ -479,12 +510,8 @@ def _plot_single_task_roc(
     ax.legend(legend_handles, legend_labels, loc="lower right", frameon=False, handlelength=1.8, borderaxespad=0.2)
     fig.tight_layout(pad=0.4)
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    save_kwargs: dict[str, Any] = {"bbox_inches": "tight", "facecolor": "white"}
-    if output_path.suffix.lower() in {".png", ".jpg", ".jpeg", ".tif", ".tiff"}:
-        save_kwargs["dpi"] = 600
-    fig.savefig(output_path, **save_kwargs)
-    print(f"单任务 AUROC 图已保存到: {output_path}")
+    saved_paths = _save_figure_outputs(fig, output_path)
+    print(f"单任务 AUROC 图已保存到: {', '.join(str(path) for path in saved_paths)}")
     plt.close(fig)
 
 
@@ -531,7 +558,7 @@ def plot_single_task_auroc(
 
 
 def _default_output_path() -> Path:
-    return Path.cwd() / "single_task_auroc.pdf"
+    return Path.cwd() / "single_task_auroc.png"
 
 
 def main() -> None:
@@ -549,7 +576,7 @@ def main() -> None:
         metavar="BOOL",
         help="是否按 AUC 动态设置曲线透明度，传 true 或 false；默认 true",
     )
-    parser.add_argument("--output", default=None, help="输出图片路径，可选；默认保存为当前运行目录下的 single_task_auroc.pdf")
+    parser.add_argument("--output", default=None, help="输出图片路径，可选；默认保存为当前运行目录下的 single_task_auroc.png，并同步导出同名 .svg")
     parser.add_argument("--title", default="", help="图标题；默认不显示标题以贴近期刊主图风格")
     args = parser.parse_args()
 
