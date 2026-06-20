@@ -30,7 +30,7 @@ NATURE_FONT_SIZES = {
     "base": 10,  # 全局基础字号，作为默认字体大小
     "axes_label": 12,  # x/y 轴标签字号
     "axes_title": 12,  # 图标题字号
-    "legend": 10,  # 图例字号
+    "legend": 9,  # 图例字号
     "tick": 8,  # 坐标轴刻度字号
 }
 
@@ -260,8 +260,11 @@ def _resolve_doctor_marker(index: int) -> str:
 def _build_doctor_legend_label(point: dict[str, Any], index: int) -> str:
     doctor_label = str(point.get("doctor_label") or "").strip()
     if doctor_label:
+        if doctor_label.lower().startswith("doctor_"):
+            suffix = doctor_label[len("doctor_") :].replace("_", " ").strip()
+            return f"Clinician {suffix}".strip()
         return doctor_label.replace("_", " ").title()
-    return f"Doctor {index + 1}"
+    return f"Clinician {index + 1}"
 
 
 def _parse_bool(value: str) -> bool:
